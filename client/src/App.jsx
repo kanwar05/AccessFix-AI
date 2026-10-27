@@ -1,30 +1,162 @@
+import Sidebar from './components/Sidebar.jsx';
+import ApiStatus from './components/ApiStatus.jsx';
+import PreviewPanel from './components/PreviewPanel.jsx';
+import IssuesPanel from './components/IssuesPanel.jsx';
+import CodeComparison from './components/CodeComparison.jsx';
+import VerificationPanel from './components/VerificationPanel.jsx';
+import Icon from './components/Icon.jsx';
+import './styles.css';
+
+const workflow = [
+  { number: '01', icon: 'scan', title: 'Detect', phase: 'Phase 2', description: 'Scan the rendered component with Playwright and axe-core.' },
+  { number: '02', icon: 'sparkles', title: 'Fix', phase: 'Phase 3', description: 'Review a JSX proposal from a real local coding model.' },
+  { number: '03', icon: 'shield', title: 'Verify', phase: 'Phase 4', description: 'Approve the change and rerun the same automated checks.' },
+];
+
 export default function App() {
   return (
-    <main id="main-content" className="mx-auto flex min-h-svh max-w-3xl items-center px-6 py-16">
-      <div className="w-full rounded-2xl border border-white/15 bg-white/[0.025] p-8 sm:p-12">
-        <p className="mb-6 text-sm font-semibold tracking-wide text-cyan-300">
-          LOCAL DEVELOPMENT · PHASE 0
-        </p>
-        <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-          AccessFix <span className="text-violet-300">AI</span>
-        </h1>
-        <p className="mt-5 text-lg leading-relaxed text-slate-200">
-          Detect. Review. Fix. Verify.
-        </p>
-        <p className="mt-4 max-w-prose leading-relaxed text-slate-300">
-          The React and Express foundation is ready. The dashboard and controlled login
-          demo arrive in Phase 1; scanning, AI proposals, and verification follow in later phases.
-        </p>
-        <a
-          href="/api/health"
-          className="mt-6 inline-flex min-h-11 items-center rounded-lg border border-cyan-300/40 px-4 py-2 font-medium text-cyan-200 underline-offset-4 hover:underline"
-        >
-          Check local API health
-        </a>
-        <p className="mt-8 border-t border-white/15 pt-6 text-sm leading-relaxed text-slate-300">
-          Automated accessibility checks find some problems. Manual testing is still needed.
-        </p>
+    <div className="app-shell">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+      <Sidebar />
+      <div className="main-shell">
+        <header className="topbar">
+          <div className="breadcrumbs">
+            <span>Workspace</span>
+            <span aria-hidden="true">/</span>
+            <span>
+              <Icon name="file" size={14} />Login form
+            </span>
+          </div>
+          <div className="topbar-status">
+            <span className="local-badge">
+              <span className="status-dot" />Local environment
+            </span>
+            <ApiStatus />
+          </div>
+        </header>
+        <main id="main-content" className="main-content" tabIndex={-1}>
+          <section
+            id="workspace"
+            className="workspace-section"
+            aria-labelledby="workspace-heading"
+            tabIndex={-1}
+          >
+            <div className="page-title-row">
+              <div>
+                <p className="eyebrow">BETTER CODE. FEWER BARRIERS.</p>
+                <h1 id="workspace-heading">
+                  Accessibility workspace<span className="title-dot">.</span>
+                </h1>
+                <p className="page-description">
+                  Detect <span>→</span> Fix <span>→</span> Verify <span className="description-divider">/</span> A little more access, one component at a time.
+                </p>
+              </div>
+              <span className="phase-badge">
+                <span className="phase-indicator" />Phase 1<span>Frontend &amp; demo</span>
+              </span>
+            </div>
+            <div className="milestone-notice">
+              <span className="notice-icon">
+                <Icon name="info" size={17} />
+              </span>
+              <p>
+                <strong>Your workspace is ready to explore.</strong> Scanning, AI fixes and verification are not connected yet.
+              </p>
+              <a href="#workflow">
+                See what’s next <Icon name="arrow" size={14} />
+              </a>
+            </div>
+            <div className="workspace-summary" aria-label="Current workspace state">
+              <div>
+                <span className="summary-icon">
+                  <Icon name="code" size={20} />
+                </span>
+                <div>
+                  <p>COMPONENT</p>
+                  <strong>
+                    React login form <span className="jsx-badge">JSX</span>
+                  </strong>
+                </div>
+              </div>
+              <div>
+                <span className="summary-icon">
+                  <Icon name="scan" size={20} />
+                </span>
+                <div>
+                  <p>DETECTION</p>
+                  <strong>
+                    Not scanned<span className="summary-detail">No results yet</span>
+                  </strong>
+                </div>
+              </div>
+              <div>
+                <span className="summary-icon">
+                  <Icon name="sparkles" size={20} />
+                </span>
+                <div>
+                  <p>AI ENGINE</p>
+                  <strong>
+                    Not connected<span className="summary-detail">Local inference planned</span>
+                  </strong>
+                </div>
+              </div>
+            </div>
+            <div className="preview-section-label">
+              <p className="eyebrow">01 / COMPONENT INSPECTION</p>
+              <span>
+                <span className="status-dot" />One controlled demo
+              </span>
+            </div>
+            <div className="inspection-grid">
+              <PreviewPanel />
+              <IssuesPanel />
+            </div>
+          </section>
+          <CodeComparison />
+          <VerificationPanel />
+          <section
+            id="workflow"
+            className="page-section workflow-section"
+            aria-labelledby="workflow-heading"
+            tabIndex={-1}
+          >
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">THE ROAD AHEAD</p>
+                <h2 id="workflow-heading">A clear path from detect to verify.</h2>
+              </div>
+              <span className="subtle-label">Next milestones</span>
+            </div>
+            <ol className="workflow-grid">
+              {workflow.map(({ number, icon, title, phase, description }) => (
+                <li key={number}>
+                  <div className="workflow-step-top">
+                    <span className="workflow-step-icon">
+                      <Icon name={icon} size={18} />
+                    </span>
+                    <span>{phase}</span>
+                  </div>
+                  <h3>
+                    <span>{number}</span>{title}
+                  </h3>
+                  <p>{description}</p>
+                </li>
+              ))}
+            </ol>
+          </section>
+          <footer className="page-footer">
+            <span>
+              <Icon name="access" size={15} />AccessFix AI
+            </span>
+            <p>Built with care. Reviewed by you.</p>
+            <a href="/api/health" target="_blank" rel="noreferrer">
+              API health <Icon name="external" size={12} /><span className="sr-only"> (new tab)</span>
+            </a>
+          </footer>
+        </main>
       </div>
-    </main>
+    </div>
   );
 }
