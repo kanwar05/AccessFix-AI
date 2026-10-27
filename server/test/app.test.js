@@ -23,8 +23,8 @@ test('API foundation returns real health and bounded JSON errors over HTTP', asy
     status: 'ok', service: 'AccessFix AI API', phase: 0,
   });
 
-  // AI is a later phase; a missing endpoint must never look successful.
-  const missing = await request('/api/generate-fix', { method: 'POST' });
+  // Applying a proposal is a later phase; a missing endpoint must never look successful.
+  const missing = await request('/api/apply-and-verify', { method: 'POST' });
   assert.equal(missing.status, 404);
   assert.equal((await missing.json()).error.code, 'NOT_FOUND');
 

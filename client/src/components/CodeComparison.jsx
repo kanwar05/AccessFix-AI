@@ -1,94 +1,111 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import originalSource from '../demo/OriginalDemo.jsx?raw';
 import activeSource from '../demo/ActiveDemo.jsx?raw';
 import Icon from './Icon.jsx';
+import SourceCode from './SourceCode.jsx';
 
-const tokenPattern = /(\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|<\/?[\w.]+|\b(?:import|from|export|default|function|const|return|if|true|false)\b)/g;
-
-function SourceLine({ line }) {
-  return line.split(tokenPattern).map((token, index) => {
-    let color;
-    if (token.startsWith('//')) color = 'syntax-comment';
-    else if (/^["']/.test(token)) color = 'syntax-string';
-    else if (token.startsWith('<')) color = 'syntax-tag';
-    else if (/^(import|from|export|default|function|const|return|if|true|false)$/.test(token)) color = 'syntax-keyword';
-    return <span key={index} className={color}>{token}</span>;
-  });
+function GenerateButton({ canGenerate, isGenerating, onGenerate }) {
+  return (
+    <button
+      type="button" className="button button-ai" disabled={!canGenerate || isGenerating}
+      aria-describedby="generate-help" onClick={onGenerate}
+    >
+      <Icon name={isGenerating ? 'clock' : 'sparkles'} size={17} className={isGenerating ? 'spin' : ''} />
+      {isGenerating ? 'Generating proposal…' : 'Generate AI Fix'}
+    </button>
+  );
 }
 
-export default function CodeComparison() {
+export default function CodeComparison({ scan, isScanning, scanError, proposal, isGenerating, error, canGenerate, onGenerate }) {
   const [version, setVersion] = useState('original');
-  const [copyStatus, setCopyStatus] = useState('idle');
-  const copyTimer = useRef(null);
-  const source = version === 'original' ? originalSource : activeSource;
-  const fileName = version === 'original' ? 'OriginalDemo.jsx' : 'ActiveDemo.jsx';
-  const lines = source.trimEnd().split('\n');
-
-  useEffect(() => () => clearTimeout(copyTimer.current), []);
-
-  async function copySource() {
-    clearTimeout(copyTimer.current);
-    try {
-      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
-      await navigator.clipboard.writeText(source);
-      setCopyStatus('copied');
-      copyTimer.current = setTimeout(() => setCopyStatus('idle'), 2500);
-    } catch {
-      setCopyStatus('error');
-    }
-  }
-
-  function selectVersion(next) {
-    clearTimeout(copyTimer.current);
-    setVersion(next);
-    setCopyStatus('idle');
-  }
+  const source = proposal ? proposal.originalCode : version === 'original' ? originalSource : activeSource;
+  const fileName = proposal || version === 'active' ? 'ActiveDemo.jsx' : 'OriginalDemo.jsx';
+  const generationHelp = isScanning ? 'A new scan is running. Any previous proposal has been discarded.'
+    : scanError ? 'Run a successful scan before requesting another proposal.'
+      : !scan ? 'Complete an accessibility scan to enable local AI generation.'
+        : scan.violatedRuleCount === 0 ? 'This scan detected no violations to send to the model. Manual testing is still needed.'
+          : isGenerating ? 'The local model is generating JSX. Your preview and source files remain unchanged.'
+            : !canGenerate ? 'Run a new accessibility scan before generating a proposal.'
+              : 'Uses the configured local Ollama model. Generation does not apply or verify a change.';
 
   return (
     <section id="source-review" className="page-section" aria-labelledby="source-heading" tabIndex={-1}>
       <div className="section-heading">
-        <div><p className="eyebrow">02 / SOURCE REVIEW</p><h2 id="source-heading">Understand every change.</h2><p>Your source on the left. A proposed improvement on the right.</p></div>
+        <div>
+          <p className="eyebrow">02 / SOURCE REVIEW</p>
+          <h2 id="source-heading">Understand every change.</h2>
+          <p>Your source on the left. An AI-generated proposal on the right.</p>
+        </div>
         <span className="subtle-label"><Icon name="lock" size={14} />You approve what gets applied</span>
       </div>
       <div className="comparison-grid">
         <div className="panel code-panel">
           <div className="panel-heading">
             <div className="heading-label"><Icon name="code" /><h3>Component source</h3></div>
-            <span className="badge badge-neutral">Read only</span>
+            <span className="badge badge-neutral">{proposal ? 'Generation basis' : 'Read only'}</span>
           </div>
-          <div className="source-toolbar">
-            <div className="source-switch" role="group" aria-label="Choose component source">
-              <button type="button" aria-pressed={version === 'original'} onClick={() => selectVersion('original')}>Original</button>
-              <button type="button" aria-pressed={version === 'active'} onClick={() => selectVersion('active')}>Active</button>
-            </div>
-            <button type="button" className="text-button" onClick={copySource} aria-label={`Copy ${fileName} source`}>
-              <Icon name={copyStatus === 'copied' ? 'check' : 'copy'} size={14} />{copyStatus === 'copied' ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <div className="code-file"><Icon name="file" size={13} /><span>{fileName}</span><span>JSX</span></div>
-          <pre className="source-code" tabIndex={0} role="region" aria-label={`${fileName} source code`}><code>{lines.map((line, index) => (
-            <span className="code-line" key={index}><span className="line-number" aria-hidden="true">{index + 1}</span><span><SourceLine line={line} />{'\n'}</span></span>
-          ))}</code></pre>
-          <div className="code-status"><span>{lines.length} lines · JavaScript JSX</span><span role="status" aria-live="polite">{copyStatus === 'error' ? 'Clipboard unavailable. Select and copy the code.' : copyStatus === 'copied' ? 'Source copied to clipboard.' : 'Loaded from the actual source file'}</span></div>
+          <SourceCode
+            key={proposal ? `${proposal.proposalId}-original` : version}
+            source={source} fileName={fileName}
+            copyLabel={proposal ? 'Copy original JSX used for proposal' : undefined}
+            statusLabel={proposal ? 'Exact source sent to the model' : 'Loaded from the actual source file'}
+            toolbar={proposal ? <span className="source-view-label">Source used for this proposal</span> : (
+              <div className="source-switch" role="group" aria-label="Choose component source">
+                <button type="button" aria-pressed={version === 'original'} onClick={() => setVersion('original')}>Original</button>
+                <button type="button" aria-pressed={version === 'active'} onClick={() => setVersion('active')}>Active</button>
+              </div>
+            )}
+          />
         </div>
-        <div className="panel suggestion-panel">
+        <div className={`panel suggestion-panel${proposal ? ' has-proposal' : ''}`} aria-busy={isGenerating}>
           <div className="panel-heading">
             <div className="heading-label"><Icon name="sparkles" /><h3>AI suggested code</h3></div>
-            <span className="badge badge-purple">Phase 3</span>
+            <span className="badge badge-purple">{isGenerating ? 'Generating' : proposal ? 'Proposal only' : 'Local Ollama'}</span>
           </div>
-          <div className="suggestion-empty">
-            <div className="suggestion-symbol"><Icon name="sparkles" size={30} /></div>
-            <p className="eyebrow">THOUGHTFUL CHANGES. YOUR CALL.</p>
-            <h3>A suggestion starts<br />with a scan.</h3>
-            <p>A local coding model will propose improved JSX here. Review the complete component before approving any change.</p>
-            <button type="button" className="button button-ai" disabled aria-describedby="generate-help"><Icon name="sparkles" size={17} />Generate AI Fix</button>
-            <p id="generate-help" className="feature-help">Not connected · Local AI arrives in Phase 3</p>
-          </div>
-          <div className="suggestion-note"><Icon name="code" size={15} /><span>No generated code yet. Your component is unchanged.</span></div>
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            {isGenerating ? 'The local coding model is generating a JSX proposal.'
+              : proposal ? 'AI-generated proposal ready for review. It is not applied or verified.' : ''}
+          </p>
+          {error && (
+            <div className="scan-error generation-error" role="alert">
+              <Icon name="info" size={18} />
+              <div><strong>AI generation could not complete.</strong><p>{error.message}</p><span>{error.code}</span></div>
+            </div>
+          )}
+          {proposal ? (
+            <>
+              <p className="proposal-notice"><Icon name="info" size={16} />AI-generated proposal — not yet applied or verified.</p>
+              <div className="proposal-metadata">
+                <span><strong>Model</strong> {proposal.model}</span>
+                <time dateTime={proposal.generatedAt}>{new Date(proposal.generatedAt).toLocaleString()}</time>
+              </div>
+              <SourceCode
+                key={proposal.proposalId} source={proposal.proposedCode} fileName="AIProposal.jsx"
+                copyLabel="Copy AI-proposed JSX" statusLabel="Proposal text only · Not executed"
+                toolbar={<span className="source-view-label">Proposed JSX · read only</span>}
+              />
+              <div className="proposal-actions">
+                <GenerateButton canGenerate={canGenerate} isGenerating={isGenerating} onGenerate={onGenerate} />
+                <p id="generate-help" className="generation-help">{generationHelp}</p>
+              </div>
+            </>
+          ) : (
+            <div className="suggestion-empty">
+              <div className="suggestion-symbol"><Icon name={isGenerating ? 'clock' : 'sparkles'} size={30} className={isGenerating ? 'spin' : ''} /></div>
+              <p className="eyebrow">THOUGHTFUL CHANGES. YOUR CALL.</p>
+              <h3>{isGenerating ? <>Waiting for your<br />local model.</> : error ? <>Check the error,<br />then try again.</> : <>A suggestion starts<br />with a scan.</>}</h3>
+              <p>{isGenerating
+                ? 'Ollama is using the current component and genuine scan findings to generate a complete JSX module.'
+                : 'Ask the local coding model for a JSX proposal. Review the complete component before approving any change.'}</p>
+              <GenerateButton canGenerate={canGenerate} isGenerating={isGenerating} onGenerate={onGenerate} />
+              <p id="generate-help" className="feature-help">{generationHelp}</p>
+            </div>
+          )}
+          {!proposal && <div className="suggestion-note"><Icon name="code" size={15} /><span>No proposal has been applied. Your component is unchanged.</span></div>}
         </div>
       </div>
       <div className="review-footer">
-        <p><Icon name="shield" size={17} />Every proposed change will require your explicit approval.</p>
+        <p><Icon name="shield" size={17} />A proposal is a suggestion, not a verified accessibility fix.</p>
         <div className="apply-control">
           <span id="apply-help">Apply and verification are not connected · Phase 4</span>
           <button type="button" className="button button-secondary" disabled aria-describedby="apply-help"><Icon name="check" size={17} />Apply &amp; Verify</button>

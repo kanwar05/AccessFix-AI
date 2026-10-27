@@ -27,8 +27,21 @@ test('configuration rejects remote services and invalid numeric settings', () =>
     { PORT: '3001.5' },
     { SCAN_TIMEOUT_MS: '-1' },
     { OLLAMA_TIMEOUT_MS: 'forever' },
+    { OLLAMA_MAX_RESPONSE_BYTES: '0' },
+    { OLLAMA_MAX_RESPONSE_BYTES: '1048577' },
+    { AI_MAX_CODE_BYTES: '-1' },
+    { AI_MAX_CODE_BYTES: '131073' },
     { OLLAMA_MODEL: ' ' },
   ]) {
     assert.throws(() => createConfig(env));
   }
+});
+
+test('AI settings default to the requested local model with bounded response limits', () => {
+  const config = createConfig({});
+  assert.equal(config.ollamaBaseUrl, 'http://127.0.0.1:11434');
+  assert.equal(config.ollamaModel, 'qwen2.5-coder:1.5b');
+  assert.equal(config.ollamaMaxResponseBytes, 262144);
+  assert.equal(config.aiMaxCodeBytes, 65536);
+  assert.equal(createConfig({ OLLAMA_TIMEOUT_MS: '600000' }).ollamaTimeoutMs, 600000);
 });

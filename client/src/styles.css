@@ -484,3 +484,35 @@ h1 { margin: 0; font-size: clamp(25px, 2.5vw, 36px); font-weight: 600; line-heig
   .impact-grid dt { font-size: 11px; }
   .scan-error { margin-inline: 13px; }
 }
+
+/* AI proposals are displayed as source text; the preview remains unchanged. */
+.button-ai:not(:disabled) { background: #6a529f; border-color: #a58bd5; color: #ffffff; }
+.button-ai:hover:not(:disabled) { background: #765ab1; border-color: #baa2e4; color: #ffffff; }
+.source-view-label { color: #bdb5cc; font-size: 11px; }
+.generation-error { margin-bottom: 2px; }
+.suggestion-empty .feature-help { max-width: 330px; line-height: 1.8; }
+.proposal-notice { display: flex; align-items: flex-start; gap: 8px; margin: 16px 16px 0; padding: 11px 12px; border: 1px solid #5b4771; border-radius: 7px; color: #e1d2f7; background: #30243f; font-size: 12px; line-height: 1.75; }
+.proposal-notice svg { margin-top: 2px; }
+.proposal-metadata { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; padding: 13px 17px; color: #c2b4d3; font-size: 10px; overflow-wrap: anywhere; }
+.proposal-metadata strong { margin-right: 5px; color: #d7cce7; font-weight: 550; }
+.proposal-metadata time { color: #b0a9be; }
+.has-proposal .source-code { flex: 1; min-height: 340px; max-height: 440px; }
+.proposal-actions { display: flex; align-items: flex-start; gap: 12px; padding: 15px 16px; border-top: 1px solid var(--border); }
+.proposal-actions .button { flex-shrink: 0; }
+.generation-help { margin: 0; color: #b9adc9; font-size: 11px; line-height: 1.8; }
+.workspace-summary .summary-detail { overflow-wrap: anywhere; }
+
+@media (max-width: 1200px) {
+  .proposal-actions { flex-direction: column; }
+}
+
+@media (max-width: 760px) {
+  .has-proposal .source-code { min-height: 310px; max-height: 370px; }
+  .proposal-actions { flex-direction: row; flex-wrap: wrap; }
+}
+
+@media (max-width: 420px) {
+  .proposal-notice { margin-inline: 13px; }
+  .proposal-metadata { padding-inline: 14px; }
+  .proposal-actions { padding-inline: 13px; }
+}

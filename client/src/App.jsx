@@ -6,22 +6,30 @@ import CodeComparison from './components/CodeComparison.jsx';
 import VerificationPanel from './components/VerificationPanel.jsx';
 import Icon from './components/Icon.jsx';
 import useAccessibilityScan from './hooks/useAccessibilityScan.js';
+import useAIFix from './hooks/useAIFix.js';
 import './styles.css';
 
 const workflow = [
   { number: '01', icon: 'scan', title: 'Detect', phase: 'Connected', description: 'Scan the rendered component with Playwright and axe-core.' },
-  { number: '02', icon: 'sparkles', title: 'Fix', phase: 'Phase 3', description: 'Review a JSX proposal from a real local coding model.' },
+  { number: '02', icon: 'sparkles', title: 'Fix', phase: 'Proposals connected', description: 'Review a JSX proposal from a real local coding model.' },
   { number: '03', icon: 'shield', title: 'Verify', phase: 'Phase 4', description: 'Approve the change and rerun the same automated checks.' },
 ];
 
 export default function App() {
   const { scan, baseline, isScanning, error, runScan } = useAccessibilityScan();
+  const ai = useAIFix({ scan, baseline, isScanning, scanError: error });
+  const startScan = () => {
+    ai.invalidateProposal();
+    runScan();
+  };
   const detectionStatus = isScanning ? 'Scanning…' : error ? 'Scan failed' : scan
     ? `${scan.violatedRuleCount} violated ${scan.violatedRuleCount === 1 ? 'rule' : 'rules'}`
     : 'Not scanned';
   const detectionDetail = error && scan ? 'Previous report retained' : scan
     ? `${scan.affectedElementCount} affected ${scan.affectedElementCount === 1 ? 'element' : 'elements'}`
     : 'Ready for a real scan';
+  const aiStatus = ai.isGenerating ? 'Generating proposal…' : ai.error ? 'Generation failed'
+    : ai.proposal ? 'Proposal generated' : ai.canGenerate ? 'Ready to request' : 'Scan required';
 
   return (
     <div className="app-shell">
@@ -63,7 +71,7 @@ export default function App() {
                 </p>
               </div>
               <span className="phase-badge">
-                <span className="phase-indicator" />Phase 2<span>Real detection</span>
+                <span className="phase-indicator" />Phase 3<span>AI proposals</span>
               </span>
             </div>
             <div className="milestone-notice">
@@ -71,7 +79,7 @@ export default function App() {
                 <Icon name="info" size={17} />
               </span>
               <p>
-                <strong>Real detection is connected.</strong> Scan the local component to collect results. AI fixes and verification arrive in later phases.
+                <strong>Detect, then review a local AI proposal.</strong> Generated code is never applied or verified in this phase.
               </p>
               <a href="#workflow">
                 See what’s next <Icon name="arrow" size={14} />
@@ -107,7 +115,7 @@ export default function App() {
                 <div>
                   <p>AI ENGINE</p>
                   <strong>
-                    Not connected<span className="summary-detail">Local inference planned</span>
+                    {aiStatus}<span className="summary-detail">{ai.proposal ? ai.proposal.model : 'Local Ollama · proposals only'}</span>
                   </strong>
                 </div>
               </div>
@@ -120,10 +128,14 @@ export default function App() {
             </div>
             <div className="inspection-grid">
               <PreviewPanel />
-              <IssuesPanel scan={scan} isScanning={isScanning} error={error} onScan={runScan} />
+              <IssuesPanel scan={scan} isScanning={isScanning} error={error} onScan={startScan} />
             </div>
           </section>
-          <CodeComparison />
+          <CodeComparison
+            scan={scan} isScanning={isScanning} scanError={error}
+            proposal={ai.proposal} isGenerating={ai.isGenerating} error={ai.error}
+            canGenerate={ai.canGenerate} onGenerate={ai.generateFix}
+          />
           <VerificationPanel baseline={baseline} />
           <section
             id="workflow"

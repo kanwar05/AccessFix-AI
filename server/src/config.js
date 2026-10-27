@@ -60,6 +60,8 @@ export function createConfig(env = process.env) {
     ).origin,
     ollamaModel,
     ollamaTimeoutMs: integerSetting(env.OLLAMA_TIMEOUT_MS, 'OLLAMA_TIMEOUT_MS', 120000, 600000),
+    ollamaMaxResponseBytes: integerSetting(env.OLLAMA_MAX_RESPONSE_BYTES, 'OLLAMA_MAX_RESPONSE_BYTES', 262144, 1048576),
+    aiMaxCodeBytes: integerSetting(env.AI_MAX_CODE_BYTES, 'AI_MAX_CODE_BYTES', 65536, 131072),
     scanTimeoutMs: integerSetting(env.SCAN_TIMEOUT_MS, 'SCAN_TIMEOUT_MS', 30000, 120000),
   });
 }

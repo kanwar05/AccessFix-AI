@@ -2,16 +2,16 @@
 
 A local React accessibility repair assistant built around **Detect → Generate → Review → Approve → Apply → Verify**.
 
-**Current milestone: Phase 2 — real accessibility detection.** The existing dashboard scans its controlled React login preview with headless Chromium and axe-core, then displays genuine rule findings, affected selectors, severity and remediation details. The first successful scan is retained as the baseline in frontend memory. AI generation, source application, reset and after-repair verification remain unavailable.
+**Current milestone: Phase 3 — AI proposal generation.** The dashboard scans its controlled React login preview with headless Chromium and axe-core, then sends the actual source and genuine findings to local Ollama for a complete JSX proposal. The proposal is parsed and checked before being displayed alongside its original source. **No generated code is applied, compiled, imported or executed.** Reset and after-repair verification remain Phase 4 work.
 
 ## Requirements
 
 - Node.js **24 LTS** recommended (`.nvmrc`); minimum 22.12.0, plus npm 10 or newer.
 - Git for version control. This repository can be pushed to GitHub with normal Git tooling.
 - Playwright's bundled Chromium, required for accessibility scans.
-- [Ollama](https://ollama.com/download) with **`qwen2.5-coder:1.5b`**, needed when implementing inference in Phase 3.
+- [Ollama](https://ollama.com/download) with **`qwen2.5-coder:1.5b`**, required for AI generation.
 
-The dashboard itself can load without Chromium, but scanning requires the browser installation below. Phase 2 does not call Ollama. The future inference implementation will use Node's built-in `fetch` to call the real local Ollama API; no hosted AI SDK is required.
+The dashboard can load without Chromium or Ollama. Scanning requires Chromium; generating a proposal requires the exact configured model in a running local Ollama service. The backend uses Node's built-in `fetch`, so no hosted AI SDK or additional dependency is needed. A service or model failure remains an error; it never produces a hardcoded fallback component.
 
 ## Run locally
 
@@ -38,7 +38,7 @@ The dashboard checks local API connectivity on load and when **Recheck API conne
 { "status": "ok", "service": "AccessFix AI API", "phase": 0 }
 ```
 
-This checks Express connectivity only, not Chromium or model readiness. The `phase: 0` field is preserved for compatibility with the original health contract; it is not the product milestone. `POST /api/scan` is implemented. `GET /api/demo`, AI generation, applying changes and reset remain unimplemented and return JSON 404 errors. The dashboard continues to read source through Vite raw imports.
+This checks Express connectivity only, not Chromium or model readiness. The `phase: 0` field is preserved for compatibility with the original health contract; it is not the product milestone. `POST /api/scan` and `POST /api/generate-fix` are implemented. `GET /api/demo`, applying changes and reset remain unimplemented and return JSON 404 errors. Ordinary source views use Vite raw imports; proposal review uses the exact original source returned with that proposal.
 
 To run each process in a separate terminal:
 
@@ -67,7 +67,9 @@ Restart the relevant process after changing settings. `.env` files are ignored b
 | `PREVIEW_URL` | server | `http://127.0.0.1:5173/preview` | Fixed scan target; must be `/preview` on `CLIENT_ORIGIN`. |
 | `OLLAMA_BASE_URL` | server | `http://127.0.0.1:11434` | Local Ollama HTTP origin. |
 | `OLLAMA_MODEL` | server | `qwen2.5-coder:1.5b` | Exact model tag for real inference. |
-| `OLLAMA_TIMEOUT_MS` | server | `120000` | Future inference timeout, capped at 600000 ms. |
+| `OLLAMA_TIMEOUT_MS` | server | `120000` | Total generation budget, including at most one malformed-code correction attempt; capped at 600000 ms. |
+| `OLLAMA_MAX_RESPONSE_BYTES` | server | `262144` | Maximum Ollama HTTP response size; capped at 1048576 bytes. |
+| `AI_MAX_CODE_BYTES` | server | `65536` | Maximum controlled input/proposed module size; capped at 131072 bytes. |
 | `SCAN_TIMEOUT_MS` | server | `30000` | Scan time budget, capped at 120000 ms. |
 
 If changing the API port, also update `API_PROXY_TARGET`. If changing the client port, also update `CLIENT_ORIGIN` and `PREVIEW_URL`. Keep the same host spelling across settings. The API and proxy reject non-loopback service origins.
@@ -164,7 +166,7 @@ This is an excerpt from that actual response; source fingerprint, policy details
 }
 ```
 
-The browser disconnected after completion, both demo files were byte-identical before and after the scan, the proxied health response was unchanged, and the later-phase POST endpoints still returned JSON 404 errors. These are observed validation results, not predefined values returned by the engine. New scans have their own identifiers and timestamps, and findings can change if source or axe versions change.
+At the Phase 2 milestone, the browser disconnected after completion, both demo files were byte-identical before and after the scan, the proxied health response was unchanged, and the then-unimplemented later-phase POST endpoints returned JSON 404 errors. These are observed historical results, not predefined values returned by the engine. New scans have their own identifiers and timestamps, and findings can change if source or axe versions change.
 
 ### Scan errors
 
@@ -186,24 +188,80 @@ Errors use `{ "error": { "code": "…", "message": "…" } }` with a helpful HTT
 
 No failed navigation, browser launch, rendering or analysis is converted into an empty successful report.
 
+## Generate an AI proposal
+
+Start Ollama using the setup instructions below, complete a real scan with detected violations, then select **Generate AI Fix**. The existing code comparison displays the complete returned module and the exact source used for that request. Generation has a loading state, prevents duplicate requests and supports retry after a reported error. The generated panel is explicitly labeled **“AI-generated proposal — not yet applied or verified.”** Its copy control copies text only. The preview continues to render `ActiveDemo.jsx`.
+
+`POST /api/generate-fix` accepts `application/json` containing only a current `scanId`. The server reads source from its fixed `ActiveDemo.jsx` path and uses its own completed scan, not client-supplied code or findings. Source fingerprints are checked before and after generation. A new scan clears the current server scan/proposal association and cancels an in-flight generation; stale responses are discarded. Restarting Express clears all server associations and requires a new scan. The initial baseline and latest successful scan remain separate in frontend memory.
+
+With both applications running, the full request sequence from PowerShell is:
+
+```powershell
+$scanResult = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:5173/api/scan'
+$proposalBody = @{ scanId = $scanResult.scanId } | ConvertTo-Json -Compress
+Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:5173/api/generate-fix' -ContentType 'application/json' -Body $proposalBody | ConvertTo-Json -Depth 12
+```
+
+The response shape is:
+
+```text
+status: "proposed"
+proposalId: server-generated identifier for future explicit approval
+scanId: the completed current scan used for the prompt
+model: actual Ollama response model, or the requested tag if omitted by Ollama
+generatedAt: ISO timestamp
+sourceHash: SHA-256 fingerprint of the controlled source
+originalCode: exact source used to build the prompt
+proposedCode: complete normalized, validated JSX text
+applied: false
+verified: false
+```
+
+The reusable client calls local `POST /api/chat` with the configured model, system/user messages, `stream: false` and `options.temperature: 0.1`. It requests at most 4096 output tokens in an 8192-token context, applies a deadline to headers and body reading, and bounds streamed response bytes and code size. The prompt contains the real module, observed rule IDs, descriptions, selectors, affected HTML and axe's remediation summaries. It asks the model to preserve styling, React hooks, exports, password visibility and local submit behavior while addressing the reported barriers. Model output is read from the actual `message.content`; it is never replaced with a prepared patch.
+
+### Proposal validation and limitations
+
+The validator trims surrounding whitespace, removes one surrounding Markdown fence when present, parses a JavaScript module with JSX using `@babel/parser`, and requires exactly one default-exported synchronous function component returning JSX. Size, syntax and supported-construct failures return actionable errors. A single correction request to the actual model may be made after invalid or unsupported code, within the same overall timeout budget.
+
+The explicit prototype policy permits ordinary React imports, pure module-level constants/functions and JSX components. Unsupported constructs include imports from other packages, dynamic imports, classes, constructors, async/generator constructs, module-scope effects, dynamic execution, network/filesystem/process/browser-storage capabilities, browser-global access, embedded documents/scripts, executable HTML injection, external resource/form targets and non-fragment links. See `PROPOSAL_POLICY` in `server/src/services/validateProposal.js` for the full list. This intentionally narrow policy may reject code that would be acceptable in a general React application.
+
+**Parsing and this policy are not a JavaScript sandbox or an accessibility verification.** Phase 3 never evaluates, renders, builds or scans the proposed module. An accepted proposal may still change behavior or leave accessibility issues; review is required, and verification belongs to Phase 4. `OriginalDemo.jsx` and `ActiveDemo.jsx` are not modified. **Apply & Verify** and **Reset Demo** remain disabled.
+
+### Generation errors
+
+| Condition | Response | Recovery |
+| --- | --- | --- |
+| No completed current scan | 409 `SCAN_REQUIRED` | Complete a new scan first. |
+| Source or scan association is stale | 409 `STALE_SCAN` | Scan the current demo, then request a new proposal. |
+| Scan has no detected violations | 422 `NO_VIOLATIONS` | There are no observed violations for the repair prompt. Manual assessment may still be needed. |
+| Scan or generation is already running | 409 `SCAN_IN_PROGRESS` / `GENERATION_IN_PROGRESS` | Wait for the operation to finish. |
+| Ollama is unavailable | 503 `OLLAMA_UNAVAILABLE` | Start the desktop application or `ollama serve`. |
+| Configured model is missing | 503 `OLLAMA_MODEL_NOT_FOUND` | Run `ollama pull qwen2.5-coder:1.5b`, or pull the configured tag. |
+| Model returns an error | 502 `OLLAMA_ERROR` | Inspect the reported model/service error and retry. |
+| Generation times out | 504 `OLLAMA_TIMEOUT` | Retry or increase the budget for the local hardware. |
+| Model response is empty, incomplete or malformed | 502 `OLLAMA_INVALID_RESPONSE` | Retry; no replacement code is fabricated. |
+| Model response exceeds its size limit | 502 `MODEL_RESPONSE_TOO_LARGE` | Request a smaller component or review the configured limits. |
+| JSX is invalid or outside the supported policy | 422 `INVALID_AI_CODE` / `UNSUPPORTED_AI_CODE` | Review the error and retry generation. |
+| Unexpected request fields | 400 `INVALID_GENERATION_INPUT` | Send only the current `scanId`; code, findings, model URLs and paths are not accepted. |
+
 ## Checks and milestone testing
 
 ```sh
 npm run check
 ```
 
-This runs ESLint, Node's built-in tests for configuration, response normalization, severity/count semantics, scanner failures and HTTP endpoints, and a production client build. Individual commands are `npm run lint`, `npm test` and `npm run build`. The automated unit/HTTP tests do not require Chromium; use a real local scan to exercise the browser engine.
+This runs ESLint, Node's built-in tests and a production client build. Tests cover the existing scanner/configuration/HTTP behavior plus mocked Ollama request/response handling, prompt construction, JSX validation and proposal lifecycle. Individual commands are `npm run lint`, `npm test` and `npm run build`. Unit/HTTP tests require neither Chromium nor Ollama; they do not prove that local inference works. Use the live scan → generate → review journey to exercise the installed model.
 
-For a manual Phase 2 smoke test:
+For a manual Phase 3 smoke test:
 
 1. Start both processes with `npm run dev`.
 2. Visit the client and confirm the dashboard, login iframe and actual code panels render. The API status should reflect a real health request.
 3. Open `/preview` directly. It should show only the login demo, with no dashboard navigation or source panels. Try the password visibility toggle and submit the form; the demo stays local and sends no credentials.
-4. Select **Scan Accessibility**. Confirm its loading state, real rule/element counts, severity breakdown and expandable issue details. Repeat the scan and confirm the initial baseline remains in the before card. The after card must remain unverified.
-5. Inspect and copy the original/current JSX. Scanning must leave both files unchanged. **Generate AI Fix**, **Apply & Verify** and **Reset Demo** remain disabled with explanations; the AI panel has no proposed JSX.
+4. Select **Scan Accessibility** and inspect the genuine findings. Confirm **Generate AI Fix** is enabled only for a completed scan with violations.
+5. Generate a proposal and observe loading, model information and returned JSX. Confirm the warning label says it has not been applied or verified, and copy the proposal. The iframe must still display the original component. **Apply & Verify** and **Reset Demo** remain disabled.
 6. Use only the keyboard to follow the skip link, dashboard navigation, preview link and available controls. Focus should remain visible. Resize to a narrow mobile width and confirm the dashboard remains usable, with code scrolling inside its panel.
-7. Visit `/api/health` through the client origin and confirm the JSON above. Try the PowerShell scan command and inspect the real response. Other unimplemented workflow endpoints should still return JSON 404 errors.
-8. With the client and backend in separate terminals, stop only the backend and retry a scan. Confirm a clear error, then restart the backend and retry successfully. You can also use **Recheck API connection** to test the separate health indicator. A failure must not erase the successful baseline or pretend that the page has no issues.
+7. Start another scan. Confirm the old proposal is invalidated, the original baseline remains and the after card stays unverified. Compare both demo files before and after generation; their bytes must be unchanged.
+8. Visit `/api/health`, try the PowerShell scan/generate sequence, and exercise a service failure. An unavailable Ollama or invalid response must produce a useful error and retry path, never fabricated JSX. Restarting Express requires a new scan. Apply/reset endpoints must still return JSON 404 errors.
 9. Stop both processes with Ctrl+C.
 
 The intentional accessibility defects are restricted to `OriginalDemo.jsx` and `ActiveDemo.jsx`: the email and password fields lack accessible names, the icon-only password toggle lacks an accessible name, and helper text has low contrast. Their visual field captions are deliberately not associated labels. The demo is unchanged from Phase 1; do not use it as a production login example.
@@ -214,9 +272,9 @@ Phase 2 validation passed `npm run check` (lint, 27 tests and the production bui
 
 The production build validates compilation only; it does not launch the scanner or exercise the future AI/apply workflow. `npm run preview --workspace client` serves the build for inspection on port 4173 without the development API proxy. Use `npm run dev` for the supported local scan workflow.
 
-## Prepare later-phase prerequisites
+## Local model setup
 
-Before Phase 3, start Ollama and pull the requested model:
+Start Ollama and pull the exact requested model:
 
 ```sh
 ollama serve
@@ -229,7 +287,7 @@ ollama pull qwen2.5-coder:1.5b
 ollama list
 ```
 
-Confirm that the exact `qwen2.5-coder:1.5b` tag is present. Other installed models are not silently substituted. Model downloads and inference are intentionally not part of Phase 2.
+Confirm that the exact `qwen2.5-coder:1.5b` tag is present. The server defaults to `http://127.0.0.1:11434`; adjust only the validated server environment settings if your local service uses another loopback origin or model tag. Other installed models are not silently substituted. Generation speed and output quality depend on local hardware and the selected open-weight model; the 1.5B model can return incomplete or unsupported code, which is rejected rather than applied.
 
 ## Project layout and next phases
 
@@ -240,9 +298,9 @@ client/
   src/
     main.jsx
     Routes.jsx                 Separate dashboard and preview entries
-    App.jsx                    Dashboard and scan/baseline state
+    App.jsx                    Dashboard, scan/baseline and proposal state
     components/                Dashboard sections and shared controls
-    hooks/                     Scan request/loading/error state
+    hooks/                     Scan and AI request/loading/error state
     styles.css
     preview/
       Preview.jsx              Renders only ActiveDemo
@@ -253,12 +311,16 @@ client/
 server/
   src/
     index.js                   Environment loading and server lifecycle
-    app.js                     Health/scan routes and JSON error handling
+    app.js                     Health/scan/generate routes and in-memory associations
     config.js                  Validated local settings and fixed demo paths
     services/
       accessibilityScanner.js  Controlled Playwright/axe browser scan
       normalizeScan.js         Genuine result normalization and counts
-  test/                        Configuration, scanner, normalization and HTTP checks
+      buildRepairPrompt.js     Actual source/findings repair prompt
+      ollamaClient.js          Bounded local /api/chat HTTP client
+      validateProposal.js      Text normalization and JSX/policy checks
+      fixGenerator.js          Current-source generation orchestration
+  test/                        Configuration, scanner, AI, validation and HTTP checks
 docs/architecture.md           Planned APIs, trust boundaries and phase gates
 ```
 
@@ -267,13 +329,13 @@ docs/architecture.md           Planned APIs, trust boundaries and phase gates
 | 0 | Setup and architecture | Implemented |
 | 1 | Frontend dashboard, controlled demo, `/preview`, raw source loading | Implemented |
 | 2 | Real Playwright/axe detection and issue reporting | Implemented |
-| 3 | Real Ollama generation, JSX validation and code review | Awaiting request |
+| 3 | Real Ollama generation, JSX validation and code review | Implemented |
 | 4 | Approved apply, rollback, rescan and reset | Awaiting request |
 | 5 | Integration tests, documentation and demo preparation | Awaiting request |
 
 See [the architecture document](docs/architecture.md) for API contracts and the apply/rollback design. Each phase ends with checks, a milestone summary and a stop until the next phase is requested.
 
-Phase 3 will connect real local Ollama inference, validate complete JSX proposals and provide reviewable AI output. Scanning never applies a fix. Approved file application, rollback, after-repair verification and reset remain Phase 4 work.
+Phase 3 generates reviewable proposals only. Approved file application, rollback, scans against proposed code, after-repair verification and reset remain Phase 4 work. Do not treat a generated or syntax-validated proposal as a successful accessibility repair.
 
 ## Prototype boundaries
 
@@ -287,3 +349,4 @@ There are no arbitrary repository uploads, user-supplied scan URLs, authenticati
 - [Tailwind CSS with Vite](https://tailwindcss.com/docs/installation/using-vite)
 - [Playwright accessibility testing](https://playwright.dev/docs/accessibility-testing)
 - [Ollama generate API](https://docs.ollama.com/api/generate)
+- [Ollama chat API](https://docs.ollama.com/api/chat)

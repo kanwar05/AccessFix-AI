@@ -9,7 +9,7 @@ try {
   const config = createConfig();
   const server = createApp({ config }).listen(config.port, config.host, () => {
     console.log(`AccessFix AI API: http://${config.host}:${config.port}`);
-    console.log(`Phase 2: scan target ${config.previewUrl}. AI inference and repairs are not implemented yet.`);
+    console.log(`Phase 3: scan target ${config.previewUrl}; local model ${config.ollamaModel}. Proposals are never applied or verified.`);
   });
 
   server.on('error', (error) => {
