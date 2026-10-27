@@ -1,0 +1,33 @@
+{
+  "name": "accessfix-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local React accessibility repair assistant: detect, review, fix, and verify.",
+  "type": "module",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others --names server,client \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "npm run dev --workspace client",
+    "dev:server": "npm run dev --workspace server",
+    "build": "npm run build --workspace client",
+    "lint": "eslint . --max-warnings 0",
+    "test": "npm run test --workspace server",
+    "check": "npm run lint && npm test && npm run build",
+    "setup:browser": "npm run setup:browser --workspace server"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^10.0.6",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0"
+  }
+}
