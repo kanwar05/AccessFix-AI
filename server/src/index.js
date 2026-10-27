@@ -7,9 +7,9 @@ dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet:
 
 try {
   const config = createConfig();
-  const server = createApp().listen(config.port, config.host, () => {
+  const server = createApp({ config }).listen(config.port, config.host, () => {
     console.log(`AccessFix AI API: http://${config.host}:${config.port}`);
-    console.log('Phase 0: server health only. Scanning and inference are not implemented yet.');
+    console.log(`Phase 2: scan target ${config.previewUrl}. AI inference and repairs are not implemented yet.`);
   });
 
   server.on('error', (error) => {

@@ -51,7 +51,7 @@ export default function ApiStatus() {
         <Icon name="reset" size={14} className={status === 'loading' ? 'spin' : ''} />
       </button>
       <span id="api-status-help" className="sr-only">
-        Checks Express connectivity only. Scanning and AI inference are not connected yet.
+        Checks Express connectivity only. Use Scan Accessibility to test the browser and preview. AI inference is not connected yet.
       </span>
     </div>
   );
