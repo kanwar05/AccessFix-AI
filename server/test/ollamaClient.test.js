@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createConfig } from '../src/config.js';
 import { createOllamaClient } from '../src/services/ollamaClient.js';
+import { REPAIR_PLAN_SCHEMA } from '../src/services/structuredRepair.js';
 
 const messages = [
   { role: 'system', content: 'Return a complete JSX component.' },
@@ -31,6 +32,7 @@ test('Ollama client sends the real chat contract and returns only actual message
   assert.ok(request.options.signal instanceof AbortSignal);
   assert.deepEqual(JSON.parse(request.options.body), {
     model: 'qwen2.5-coder:1.5b', messages, stream: false,
+    format: REPAIR_PLAN_SCHEMA,
     options: { temperature: 0.1, num_predict: 4096, num_ctx: 8192 },
   });
 });

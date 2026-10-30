@@ -1,45 +1,22 @@
 # AccessFix AI demo script
 
-Target length: 90–120 seconds. Run locally with the documented `npm run dev` command. Do not present placeholder, cached, or fabricated model output as live output.
+Target: **110 seconds**. Use the local dashboard with Ollama and the exact `qwen2.5-coder:1.5b` model running. Start with **Reset Demo** in the verification section. Keep source review readable; use genuine application results throughout.
 
-## Opening — 0:00–0:15
+| Time | Screen and action | Narration |
+| --- | --- | --- |
+| 0:00–0:10 | Show the local dashboard and login preview. | “A page can look fine while invisible accessibility barriers haunt it. AccessFix AI makes those barriers visible.” |
+| 0:10–0:28 | Enable Ghost Mode, select **Scan Accessibility**, expand actual findings. | “Playwright opens this controlled React preview and axe-core checks the rendered page. These rule IDs, selectors and failure summaries come from that scan.” |
+| 0:28–0:50 | Select **Generate AI Fix**. Show the real generation/loading state, then model name and rationale. | “Qwen runs locally through Ollama. It chooses a small edit from the real findings and explains the choice. The server translates only a supported operation; both code validators still apply.” |
+| 0:50–1:08 | Compare the original and proposed helper color. Select **Approve & Apply**, cancel the first confirmation, then review and explicitly accept the second. | “Generation changes nothing. Canceling approval also changes nothing. After review, I approve this proposal for the active demo.” |
+| 1:08–1:33 | Show the genuine before/after verification counts and resolved/remaining IDs. Return to Ghost Mode and expand remaining findings. | “A fresh browser scan checks the result. The verified report shows what resolved and what remains. The remaining ghosts are still visible; no new violation is hidden.” |
+| 1:33–1:50 | Select the enabled **Reset Demo** in the verification section, then **Scan Accessibility**. | “Reset restores the trusted original, and another scan confirms the initial barriers are back. The model proposes, a person approves, and the browser supplies the evidence.” |
 
-Show the AccessFix AI dashboard and say: “A page can look correct while invisible barriers prevent people from using it. AccessFix AI finds those barriers in the rendered component.”
+The recorded counts and exact model-selected change are in [demo results](demo-results.md). Use the new run's results when recording; do not assume the model will choose the same color again.
 
-Point out that the dashboard is local-first and that the configured model is shown after a proposal is generated.
+Ghost Mode renders the latest findings. A resolved rule disappears from that list; its ID remains in the verification report. **Still Haunting** means the after-scan still reports that rule. **New Apparition** is shown only if a new rule was actually introduced. Do not promise an individual “Ghost Removed” card after it has left the current findings list.
 
-## Discovery — 0:15–0:35
+If local inference takes longer than this plan allows, record the complete real workflow, then trim only waiting time and label the cut with actual elapsed time. Do not splice in a prepared patch, cached proposal or fabricated success. If generation or validation fails, show the error and describe that take as blocked.
 
-1. Open the original login preview.
-2. Turn on **Ghost Mode**.
-3. Select **Scan Accessibility**.
-4. Expand the actual axe findings and show the rule ID, impact, affected selector and remediation guidance.
+Before recording, run `npm run check`, keep Vite/API/Ollama running, and verify that the baseline is restored. Avoid exposing unrelated windows or personal data. The fixture's credentials are demonstration strings. Automated axe results do not establish full WCAG conformance; keyboard, screen-reader and content review remain necessary.
 
-Say: “These ghosts are not a scripted list. They are the findings from this completed Playwright and axe-core scan.”
-
-## AI repair — 0:35–0:58
-
-1. Select **Generate AI Fix**.
-2. Show the configured Ollama model and the read-only proposal.
-3. Explain that the proposal is source-bound and has not changed the preview.
-4. Review the code comparison before selecting **Approve & Apply**.
-
-If the model is unavailable or its output is rejected by the safety gate, show the error honestly and continue with the safety explanation. Do not substitute a prepared patch.
-
-## Safety and proof — 0:58–1:20
-
-After an accepted proposal, show the explicit approval action, the AST-restricted apply step and the genuine after-scan. In Ghost Mode, show **Ghost Removed**, **Still Haunting** and **New Apparition** only when the verification report contains those rule IDs.
-
-Say: “The model suggests a change; a human approves it; the server restricts what can be written; Playwright and axe-core provide the proof.”
-
-## Ending — 1:20–1:40
-
-Select **Reset Demo** and show that the trusted original is restored. End with: “AccessFix AI reveals and repairs hidden web accessibility problems using open-weight AI, while keeping the source local and the evidence visible.”
-
-## Recording checklist
-
-- Use a fresh scan for the recording.
-- Capture the model name, scan ID, baseline counts and after-scan counts.
-- Do not claim a repair unless verification returns it.
-- If generation is blocked, record the exact error and label the workflow as blocked.
-- Respect reduced motion and keep the browser zoom/viewport readable.
+For a repeatable evidence run with an explicit review pause, stop existing Vite/API processes and run `node scripts/e2e-proof.mjs`. Read the generated plan and exact source delta before entering the requested proposal-specific approval. The script calls the actual model, exercises the browser confirmation and reset, and writes new evidence and screenshots.

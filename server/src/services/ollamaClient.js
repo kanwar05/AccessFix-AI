@@ -1,4 +1,5 @@
 import { ScanError } from '../errors.js';
+import { REPAIR_PLAN_SCHEMA } from './structuredRepair.js';
 
 function invalidResponse(message, cause) {
   return new ScanError(502, 'OLLAMA_INVALID_RESPONSE', message, cause ? { cause } : undefined);
@@ -81,6 +82,7 @@ export function createOllamaClient(config, { fetch: fetchImpl = globalThis.fetch
           model: config.ollamaModel,
           messages,
           stream: false,
+          format: REPAIR_PLAN_SCHEMA,
           options: { temperature: 0.1, num_predict: 4096, num_ctx: 8192 },
         }),
       });

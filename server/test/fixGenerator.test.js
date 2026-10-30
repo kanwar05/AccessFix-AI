@@ -101,18 +101,34 @@ test('unsupported model code is rejected without execution or a fallback patch',
 });
 
 test('a model edit plan is applied to the original source and safety-checked', async () => {
+  const controlled = "const styles = { helper: { color: '#aaaaaa' } }; export default function Demo() { return <p style={styles.helper}>Helper</p>; }";
+  const contrastScan = { ...scanFor(controlled), violations: [{ id: 'color-contrast', nodes: [{ html: '<p style="color: rgb(170, 170, 170);">Helper</p>', checks: { any: [{ id: 'color-contrast', data: { fgColor: '#aaaaaa', bgColor: '#ffffff', expectedContrastRatio: '4.5:1' } }] } }] }] };
   const generate = createFixGenerator(config, {
-    readSource: async () => source,
+    readSource: async () => controlled,
     chat: async () => ({
       model: 'test-model',
       content: JSON.stringify({
-        edits: [{ find: '<p>Email</p>', replace: '<label htmlFor="email">Email</label>' }],
+        edits: [{ operation: 'set-static-color', target: 'styles.helper.color', value: '#333333', ruleId: 'color-contrast', reason: 'The scanned Helper text has insufficient contrast on white.' }],
       }),
     }),
   });
-  const report = await generate(scanFor());
-  assert.equal(report.proposedCode, code);
-  assert.equal(report.originalCode, source);
+  const report = await generate(contrastScan);
+  assert.equal(report.proposedCode, controlled.replace("'#aaaaaa'", '"#333333"'));
+  assert.equal(report.originalCode, controlled);
+});
+
+test('AST-rejected model rewrites get only one correction attempt and never escape the gate', async () => {
+  let calls = 0;
+  const generate = createFixGenerator(config, {
+    readSource: async () => source,
+    chat: async (messages) => {
+      calls++;
+      if (calls === 2) assert.match(messages.at(-1).content, /changed visible component content|changed executable or component structure/);
+      return { model: 'test-model', content: source.replace('Email</p>', 'Unrelated text</p>') };
+    },
+  });
+  await assert.rejects(generate(scanFor()), (error) => error.code === 'UNSUPPORTED_PROPOSED_CHANGE');
+  assert.equal(calls, 2);
 });
 
 test('service errors are not retried and the total generation deadline bounds all model work', async () => {

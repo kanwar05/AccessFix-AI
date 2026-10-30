@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { parse } from '@babel/parser';
 import { demoPaths } from '../config.js';
 import { ScanError } from '../errors.js';
@@ -168,17 +168,16 @@ export function assertSafeProposal(originalCode, proposedCode) {
   return proposed;
 }
 
-async function replaceSource(source, { read = readFile, write = writeFile, move = rename } = {}) {
+async function replaceSource(source, { write = writeFile, move = rename } = {}) {
   const target = demoPaths.active;
   const temporary = `${target}.accessfix-${process.pid}-${Date.now()}.tmp`;
   await write(temporary, source, { encoding: 'utf8', mode: 0o600 });
   try {
     await move(temporary, target);
   } catch (error) {
-    await write(target, source, { encoding: 'utf8', mode: 0o600 }).catch(() => {});
+    await unlink(temporary).catch(() => {});
     throw new ScanError(500, 'SOURCE_WRITE_FAILED', 'The controlled demo could not be replaced safely.', { cause: error });
   }
-  return read(target, 'utf8');
 }
 
 export function createApplyService({ read = readFile, write = writeFile, move = rename } = {}) {

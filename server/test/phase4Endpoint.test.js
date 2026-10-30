@@ -14,8 +14,9 @@ function report(scanId, sourceHash, ids) {
   };
 }
 
-async function setup({ verificationFails = false, applyService = null, onApply = () => {} } = {}) {
+async function setup({ verificationFails = false, verificationReadFails = false, applyService = null, onApply = () => {} } = {}) {
   let active = source;
+  let activeReads = 0;
   let scanNumber = 0;
   const before = report('scan-before', hashSource(source), ['label', 'button-name']);
   const after = report('scan-after', hashSource(proposalSource), verificationFails ? ['label', 'new-rule'] : []);
@@ -45,7 +46,10 @@ async function setup({ verificationFails = false, applyService = null, onApply =
         return { sourceHash: hashSource(original) };
       },
     },
-    readActiveSource: async () => active,
+    readActiveSource: async () => {
+      if (++activeReads === 2 && verificationReadFails) throw new Error('post-scan source read failed');
+      return active;
+    },
     readOriginalSource: async () => source,
   });
   const server = app.listen(0, '127.0.0.1');
@@ -95,8 +99,45 @@ test('apply-and-verify applies an approved proposal and reset restores the origi
   })).status, 409);
 });
 
+test('missing, false and non-boolean approvals cannot modify the active source', async (t) => {
+  let applyCount = 0;
+  const fixture = await setup({ onApply: () => { applyCount++; } });
+  t.after(fixture.close);
+  const { scanBody, proposal } = await scanAndGenerate(fixture);
+  const identifiers = { proposalId: proposal.proposalId, scanId: scanBody.scanId };
+
+  for (const payload of [
+    identifiers,
+    { ...identifiers, approved: false },
+    { ...identifiers, approved: 'true' },
+    { ...identifiers, approved: true, proposedCode: proposalSource },
+  ]) {
+    const response = await fixture.request('/api/apply-and-verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, 'INVALID_APPROVAL_INPUT');
+    assert.equal(fixture.active, source);
+  }
+  assert.equal(applyCount, 0);
+});
+
 test('verification failure rolls back the active source and leaves the original immutable', async (t) => {
   const fixture = await setup({ verificationFails: true });
+  t.after(fixture.close);
+  const { scanBody, proposal } = await scanAndGenerate(fixture);
+  const response = await fixture.request('/api/apply-and-verify', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ proposalId: proposal.proposalId, scanId: scanBody.scanId, approved: true }),
+  });
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error.code, 'APPLY_ROLLED_BACK');
+  assert.equal(fixture.active, source);
+});
+
+test('post-scan source read failure rolls back even after a successful scan', async (t) => {
+  const fixture = await setup({ verificationReadFails: true });
   t.after(fixture.close);
   const { scanBody, proposal } = await scanAndGenerate(fixture);
   const response = await fixture.request('/api/apply-and-verify', {

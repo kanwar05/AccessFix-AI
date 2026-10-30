@@ -169,13 +169,12 @@ export function createApp({
       let after;
       try {
         after = await scan();
+        if (hashSource(await readActiveSource()) !== applied.sourceHash) {
+          throw new ScanError(409, 'SOURCE_CHANGED', 'The active source changed during verification.');
+        }
       } catch (error) {
         await applyService.restore(originalCode);
-        throw new ScanError(422, 'APPLY_ROLLED_BACK', 'The proposal was rolled back because the updated preview failed to compile, render, or scan.', { cause: error });
-      }
-      if (hashSource(await readActiveSource()) !== applied.sourceHash) {
-        await applyService.restore(originalCode);
-        throw new ScanError(422, 'APPLY_ROLLED_BACK', 'The proposal was rolled back because the active source changed during verification.');
+        throw new ScanError(422, 'APPLY_ROLLED_BACK', 'The proposal was rolled back because the updated preview failed to compile, render, scan, or retain consistent source.', { cause: error });
       }
       const verification = compareVerification(before, after);
       session.revision++;

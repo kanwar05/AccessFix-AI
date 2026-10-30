@@ -9,7 +9,7 @@ import { assertSafeProposal } from './applyProposal.js';
 import { applyStructuredRepairEdits } from './structuredRepair.js';
 
 const sourceHash = (source) => createHash('sha256').update(source).digest('hex');
-const looksLikeStructuredEdits = (content) => /^\s*(?:\{\s*"edits"|\s*```json)/i.test(content);
+const looksLikeStructuredEdits = (content) => /^\s*(?:\{|```json)/i.test(content);
 
 export function assertRepairScan(scan) {
   if (
@@ -51,6 +51,7 @@ export function createFixGenerator(config, dependencies = {}) {
       const messages = buildRepairPrompt(originalCode, scan);
       let proposedCode;
       let model;
+      let editPlan;
       for (let attempt = 0; attempt < 2; attempt++) {
         controller.signal.throwIfAborted();
         const response = await chat(messages, { signal: controller.signal });
@@ -58,18 +59,18 @@ export function createFixGenerator(config, dependencies = {}) {
         model = response.model;
         try {
           proposedCode = looksLikeStructuredEdits(response.content)
-            ? applyStructuredRepairEdits(originalCode, response.content)
+            ? validate(applyStructuredRepairEdits(originalCode, response.content, scan), { maxCodeBytes: config.aiMaxCodeBytes })
             : validate(response.content, { maxCodeBytes: config.aiMaxCodeBytes });
           validateSafety(originalCode, proposedCode);
+          editPlan = looksLikeStructuredEdits(response.content) ? JSON.parse(response.content) : undefined;
           break;
         } catch (error) {
-          if (attempt === 1 || !['INVALID_AI_CODE', 'UNSUPPORTED_AI_CODE', 'INVALID_AI_EDIT_PLAN'].includes(error.code)) throw error;
+          if (attempt === 1 || !['INVALID_AI_CODE', 'UNSUPPORTED_AI_CODE', 'INVALID_AI_EDIT_PLAN', 'UNSUPPORTED_PROPOSED_CHANGE'].includes(error.code)) throw error;
           // One correction request to the real model; never substitute a prepared patch.
           messages.push(
             { role: 'assistant', content: response.content },
             { role: 'user', content: `Your previous module was rejected by the syntax or apply safety validator: ${error.message}
-Return a JSON object only in this exact shape: {"edits":[{"find":"exact source fragment","replace":"replacement fragment"}]}.
-Use one to eight exact, unique string replacements against the supplied source. Make only these allowlisted edits: add a static aria-label, add a static htmlFor, add a static id, convert the visible form-label <p> to <label>, or change styles.helper.color to a static six-digit hex value. Preserve every other character and all wrapper elements. Do not change visible text, add elements, restructure JSX, change handlers, change unrelated styles, add imports, or add executable logic.` },
+Return only the typed JSON edit plan matching the supplied schema. Select set-static-color for an existing supported target, choose a replacement hex value, and give a reason based on the genuine scan. Do not return JSX or find/replace fragments.` },
           );
         }
       }
@@ -81,6 +82,7 @@ Use one to eight exact, unique string replacements against the supplied source. 
         status: 'proposed', proposalId: randomUUID(), scanId: scan.scanId,
         model, generatedAt: new Date().toISOString(), sourceHash: scan.sourceHash,
         originalCode, proposedCode, applied: false, verified: false,
+        ...(editPlan ? { editPlan } : {}),
       };
     } catch (error) {
       if (controller.signal.aborted && controller.signal.reason instanceof ScanError) throw controller.signal.reason;

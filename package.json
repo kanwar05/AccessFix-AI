@@ -1,6 +1,7 @@
 {
   "name": "accessfix-ai",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "description": "A local React accessibility repair assistant: detect, review, fix, and verify.",
   "type": "module",

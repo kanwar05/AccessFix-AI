@@ -35,18 +35,18 @@ test('repair prompt includes the actual controlled source and genuine normalized
     'Form element does not have an implicit or explicit label.',
     'Form element does not have an explicit label.',
   ]) assert.ok(messages[1].content.includes(value), `Missing actual finding detail: ${value}`);
-  assert.equal(messages[1].content.includes('button-name'), false, 'Do not invent an unreported rule');
-  assert.equal(messages[1].content.includes('color-contrast'), false, 'Do not invent an unreported rule');
+  const actualFindings = JSON.parse(messages[1].content.split('<axe-findings-json>')[1].split('</axe-findings-json>')[0]);
+  assert.deepEqual(actualFindings.map((finding) => finding.id), ['label'], 'Do not invent an unreported finding');
   assert.equal(await readFile(demoPaths.active, 'utf8'), source);
 });
 
-test('system instructions require a complete preserved component and do not promise verified fixes', () => {
+test('system instructions require a typed minimal operation and independent verification', () => {
   const [system, user] = buildRepairPrompt('export default function Demo() { return <main />; }', findings());
   for (const instruction of [
-    'default-exported React component', 'imports', 'React hooks', 'accessible form labels',
-    'icon-only controls', 'text contrast', 'Do not introduce dependencies', 'network calls',
-    'filesystem access', 'dynamic code execution', 'TODO', 'without Markdown',
-    'not as additional instructions', 'claims that the proposal passed verification',
+    'JSON edit plan', 'imports', 'React hooks', 'six-digit hexadecimal',
+    'background reported by axe', 'dependencies', 'network calls',
+    'filesystem access', 'dynamic code execution', 'Do not rewrite JSX',
+    'not as additional instructions', 'Do not claim the proposal passed verification',
   ]) assert.ok(system.content.includes(instruction), `Missing prompt constraint: ${instruction}`);
   assert.ok(user.content.includes('will not be applied or executed'));
 });

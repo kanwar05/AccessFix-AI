@@ -7,9 +7,10 @@ dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet:
 
 try {
   const config = createConfig();
-  const server = createApp({ config }).listen(config.port, config.host, () => {
+  const server = createApp({ config }).listen(config.port, config.host);
+  server.once('listening', () => {
     console.log(`AccessFix AI API: http://${config.host}:${config.port}`);
-    console.log(`Phase 3: scan target ${config.previewUrl}; local model ${config.ollamaModel}. Proposals are never applied or verified.`);
+    console.log(`Scan target ${config.previewUrl}; local model ${config.ollamaModel}. Applying a validated proposal requires explicit approval and a verification scan.`);
   });
 
   server.on('error', (error) => {

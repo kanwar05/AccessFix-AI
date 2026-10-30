@@ -24,7 +24,7 @@ export default function CodeComparison({ scan, isScanning, scanError, proposal, 
     : scanError ? 'Run a successful scan before requesting another proposal.'
       : !scan ? 'Complete an accessibility scan to enable local AI generation.'
         : scan.violatedRuleCount === 0 ? 'This scan detected no violations to send to the model. Manual testing is still needed.'
-          : isGenerating ? 'The local model is generating JSX. Your preview and source files remain unchanged.'
+          : isGenerating ? 'The local model is proposing a targeted edit. Your preview and source files remain unchanged.'
             : !canGenerate ? 'Run a new accessibility scan before generating a proposal.'
               : 'Uses the configured local Ollama model. Generation does not apply or verify a change.';
 
@@ -60,11 +60,12 @@ export default function CodeComparison({ scan, isScanning, scanError, proposal, 
         <div className={`panel suggestion-panel${proposal ? ' has-proposal' : ''}`} aria-busy={isGenerating}>
           <div className="panel-heading">
             <div className="heading-label"><Icon name="sparkles" /><h3>AI suggested code</h3></div>
-            <span className="badge badge-purple">{isGenerating ? 'Generating' : proposal ? 'Proposal only' : 'Local Ollama'}</span>
+            <span className="badge badge-purple">{isGenerating ? 'Generating' : proposal?.applied ? 'Applied & verified' : proposal ? 'Proposal only' : 'Local Ollama'}</span>
           </div>
           <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
             {isGenerating ? 'The local coding model is generating a JSX proposal.'
-              : proposal ? 'AI-generated proposal ready for review. It is not applied or verified.' : ''}
+              : proposal?.applied ? 'AI-generated change applied. Verification results are available below.'
+                : proposal ? 'AI-generated proposal ready for review. It is not applied or verified.' : ''}
           </p>
           {error && (
             <div className="scan-error generation-error" role="alert">
@@ -74,14 +75,17 @@ export default function CodeComparison({ scan, isScanning, scanError, proposal, 
           )}
           {proposal ? (
             <>
-              <p className="proposal-notice"><Icon name="info" size={16} />AI-generated proposal — not yet applied or verified.</p>
+              <p className="proposal-notice"><Icon name="info" size={16} />{proposal.applied ? 'AI-generated change applied. See independent scan results below.' : 'AI-generated proposal — not yet applied or verified.'}</p>
               <div className="proposal-metadata">
                 <span><strong>Model</strong> {proposal.model}</span>
                 <time dateTime={proposal.generatedAt}>{new Date(proposal.generatedAt).toLocaleString()}</time>
               </div>
+              {proposal.editPlan?.edits.map((edit) => (
+                <p key={edit.target} className="generation-help"><strong>Model rationale:</strong> {edit.reason}</p>
+              ))}
               <SourceCode
                 key={proposal.proposalId} source={proposal.proposedCode} fileName="AIProposal.jsx"
-                copyLabel="Copy AI-proposed JSX" statusLabel="Proposal text only · Not executed"
+                copyLabel="Copy AI-proposed JSX" statusLabel={proposal.applied ? 'Applied to the controlled demo' : 'Proposal text only · Not executed'}
                 toolbar={<span className="source-view-label">Proposed JSX · read only</span>}
               />
               <div className="proposal-actions">
@@ -105,7 +109,7 @@ export default function CodeComparison({ scan, isScanning, scanError, proposal, 
               <p className="eyebrow">THOUGHTFUL CHANGES. YOUR CALL.</p>
               <h3>{isGenerating ? <>Waiting for your<br />local model.</> : error ? <>Check the error,<br />then try again.</> : <>A suggestion starts<br />with a scan.</>}</h3>
               <p>{isGenerating
-                ? 'Ollama is using the current component and genuine scan findings to generate a complete JSX module.'
+                ? 'Ollama is using the current component and genuine scan findings to propose a targeted repair.'
                 : 'Ask the local coding model for a JSX proposal. Review the complete component before approving any change.'}</p>
               <GenerateButton canGenerate={canGenerate} isGenerating={isGenerating} onGenerate={onGenerate} />
               <p id="generate-help" className="feature-help">{generationHelp}</p>
