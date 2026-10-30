@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Sidebar from './components/Sidebar.jsx';
 import ApiStatus from './components/ApiStatus.jsx';
 import PreviewPanel from './components/PreviewPanel.jsx';
@@ -18,6 +19,7 @@ const workflow = [
 export default function App() {
   const { scan, baseline, isScanning, error, runScan, replaceScan, clearResults } = useAccessibilityScan();
   const ai = useAIFix({ scan, baseline, isScanning, scanError: error, replaceScan, clearResults });
+  const [ghostMode, setGhostMode] = useState(false);
   const startScan = () => {
     ai.invalidateProposal();
     runScan();
@@ -71,7 +73,7 @@ export default function App() {
                 </p>
               </div>
               <span className="phase-badge">
-                <span className="phase-indicator" />Phase 3<span>AI proposals</span>
+                <span className="phase-indicator" />Phase 5<span>Ghost Mode</span>
               </span>
             </div>
             <div className="milestone-notice">
@@ -79,7 +81,7 @@ export default function App() {
                 <Icon name="info" size={17} />
               </span>
               <p>
-                <strong>Detect, then review a local AI proposal.</strong> Generated code is never applied or verified in this phase.
+                <strong>Reveal invisible barriers, then verify every repair.</strong> Ghost Mode reflects only genuine axe findings and verification results.
               </p>
               <a href="#workflow">
                 See what’s next <Icon name="arrow" size={14} />
@@ -128,7 +130,11 @@ export default function App() {
             </div>
             <div className="inspection-grid">
               <PreviewPanel />
-              <IssuesPanel scan={scan} isScanning={isScanning} error={error} onScan={startScan} />
+              <IssuesPanel
+                scan={scan} isScanning={isScanning} error={error} onScan={startScan}
+                ghostMode={ghostMode} onGhostModeChange={setGhostMode}
+                proposal={ai.proposal} verification={ai.verification}
+              />
             </div>
           </section>
           <CodeComparison

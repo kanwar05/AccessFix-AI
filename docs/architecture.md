@@ -1,6 +1,6 @@
 # AccessFix AI architecture
 
-AccessFix AI is a local hackathon prototype for one predefined React component. Its intended workflow is **Detect → Generate → Review → Approve → Apply → Verify**. Phases 0–3 implement the local foundation, dashboard, controlled preview, real detection and AI proposal generation/review. Application, reset and after-repair verification remain Phase 4 work.
+AccessFix AI is a local hackathon prototype for one predefined React component. Its intended workflow is **Detect → Generate → Review → Approve → Apply → Verify → Explain**. Phases 0–4 implement the local foundation, dashboard, controlled preview, real detection, AI proposal generation/review and safe application/verification. Phase 5 adds Ghost Mode and reproducible submission documentation without changing the repair trust boundary.
 
 ## Local services
 
@@ -159,6 +159,10 @@ The apply AST policy allows only static `aria-label`, `htmlFor` and `id` additio
 Use bounded timeouts and close browser contexts on all paths. Distinguish service-unavailable, timeout, malformed-model-output, stale-candidate, validation, browser and rollback errors so the dashboard can explain a useful next step.
 
 ## Scope and phase gates
+
+### Phase 5 presentation boundary
+
+Ghost Mode is client-side presentation state only. It consumes the existing completed scan, proposal and verification objects and derives labels from their real rule IDs. It never creates findings, changes a scan, modifies source, approves a proposal or converts an unverified proposal into a success. The toggle is a semantic checkbox and respects the dashboard's existing keyboard focus and reduced-motion behavior.
 
 | Phase | Deliverable | Gate before continuing |
 | --- | --- | --- |

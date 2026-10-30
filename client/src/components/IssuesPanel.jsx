@@ -1,4 +1,5 @@
 import Icon from './Icon.jsx';
+import { getGhostStatus } from '../lib/ghostMode.js';
 
 function ScanButton({ isScanning, onScan }) {
   return (
@@ -12,7 +13,8 @@ function ScanButton({ isScanning, onScan }) {
   );
 }
 
-function IssueCard({ issue }) {
+function IssueCard({ issue, ghostMode, proposal, verification }) {
+  const status = ghostMode ? getGhostStatus(issue.id, { proposal, verification }) : null;
   return (
     <details className="issue-card">
       <summary>
@@ -23,6 +25,12 @@ function IssueCard({ issue }) {
         <span className={`badge issue-impact impact-${issue.impact}`}>{issue.impact}</span>
       </summary>
       <div className="issue-details">
+        {status && (
+          <div className={`ghost-finding-status ghost-status-${status.className}`}>
+            <Icon name="ghost" size={15} className="ghost-mark" />
+            <span><strong>{status.label}</strong><br />{status.description}</span>
+          </div>
+        )}
         <p>{issue.description}</p>
         <h3>Recommended action</h3>
         <p>{issue.recommendedAction}</p>
@@ -50,12 +58,19 @@ function IssueCard({ issue }) {
         <a href={issue.helpUrl} target="_blank" rel="noreferrer" className="issue-documentation">
           Read {issue.id} documentation <Icon name="external" size={13} /><span className="sr-only"> (new tab)</span>
         </a>
+        {ghostMode && proposal && (
+          <a href="#source-review" className="ghost-proposal-link">
+            {proposal.applied ? 'Inspect the verified proposal' : 'Inspect the proposed exorcism'} <Icon name="arrow" size={13} />
+          </a>
+        )}
       </div>
     </details>
   );
 }
 
-export default function IssuesPanel({ scan, isScanning, error, onScan }) {
+export default function IssuesPanel({
+  scan, isScanning, error, onScan, ghostMode, onGhostModeChange, proposal, verification,
+}) {
   const resultDescription = scan
     ? `${scan.violatedRuleCount} violated ${scan.violatedRuleCount === 1 ? 'rule' : 'rules'} affecting ${scan.affectedElementCount} ${scan.affectedElementCount === 1 ? 'element' : 'elements'}.`
     : '';
@@ -65,7 +80,14 @@ export default function IssuesPanel({ scan, isScanning, error, onScan }) {
     <section className="panel issues-panel" aria-labelledby="issues-heading">
       <div className="panel-heading">
         <div className="heading-label"><Icon name="scan" /><h2 id="issues-heading">Accessibility issues</h2></div>
-        <span className="badge badge-neutral">{status}</span>
+        <div className="issues-heading-actions">
+          <label className="ghost-toggle">
+            <input type="checkbox" checked={ghostMode} onChange={(event) => onGhostModeChange(event.target.checked)} />
+            <span className="ghost-toggle-track" aria-hidden="true"><span /></span>
+            <span>Ghost Mode</span>
+          </label>
+          <span className="badge badge-neutral">{status}</span>
+        </div>
       </div>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {isScanning ? 'Accessibility scan in progress.' : error ? '' : scan ? `Scan complete. ${resultDescription}` : 'Ready to scan the local component.'}
@@ -89,6 +111,17 @@ export default function IssuesPanel({ scan, isScanning, error, onScan }) {
         </div>
       ) : (
         <div className="scan-results" aria-busy={isScanning}>
+          {ghostMode && (
+            <div className="ghost-mode-intro" role="status">
+              <div className="ghost-mode-title"><Icon name="ghost" size={16} className="ghost-emblem" /><strong>Ghost Mode is revealing real barriers</strong></div>
+              <p>These apparitions come from the completed axe scan. A ghost is removed only when the after-scan verifies the rule is resolved.</p>
+              <div className="ghost-legend" aria-label="Ghost Mode status legend">
+                <span><i className="ghost-legend-dot detected" />Ghost Detected</span>
+                <span><i className="ghost-legend-dot proposed" />Awaiting Permission</span>
+                <span><i className="ghost-legend-dot resolved" />Ghost Removed</span>
+              </div>
+            </div>
+          )}
           <div className="scan-result-toolbar">
             <div><p className="eyebrow">LATEST COMPLETED SCAN</p><time dateTime={scan.scannedAt}>{new Date(scan.scannedAt).toLocaleString()}</time></div>
             <ScanButton isScanning={isScanning} onScan={onScan} />
@@ -106,7 +139,12 @@ export default function IssuesPanel({ scan, isScanning, error, onScan }) {
             <div className="scan-zero-state"><Icon name="shield" size={25} /><h3>No accessibility violations were detected by the automated scan.</h3><p>Automated checks cover some issues. Manual keyboard and screen reader testing is still needed.</p></div>
           ) : (
             <div className="issues-list" role="region" aria-label="Accessibility findings" tabIndex={0}>
-              {scan.violations.map((issue) => <IssueCard key={issue.id} issue={issue} />)}
+              {scan.violations.map((issue) => (
+                <IssueCard
+                  key={issue.id} issue={issue} ghostMode={ghostMode}
+                  proposal={proposal} verification={verification}
+                />
+              ))}
             </div>
           )}
         </div>

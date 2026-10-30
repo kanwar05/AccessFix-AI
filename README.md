@@ -2,7 +2,7 @@
 
 A local React accessibility repair assistant built around **Detect → Generate → Review → Approve → Apply → Verify**.
 
-**Current milestone: Phase 4 — Apply and verify.** The dashboard scans its controlled React login preview with headless Chromium and axe-core, sends the actual source and genuine findings to local Ollama, then lets the user explicitly approve a restricted JSX proposal. The server applies only allowlisted accessibility changes, reruns the same scan, reports before/after results, rolls back failures, and can reset the active demo to the trusted original. Real model output that falls outside the allowlist is rejected.
+**Current milestone: Phase 5 — Ghost Mode and submission readiness.** The dashboard scans its controlled React login preview with headless Chromium and axe-core, reveals genuine findings in Ghost Mode, sends the actual source and findings to local Ollama, then lets the user explicitly approve a restricted JSX proposal. The server applies only allowlisted accessibility changes, reruns the same scan, reports before/after results, rolls back failures, and can reset the active demo to the trusted original. Real model output that falls outside the allowlist is rejected.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ The dashboard checks local API connectivity on load and when **Recheck API conne
 { "status": "ok", "service": "AccessFix AI API", "phase": 0 }
 ```
 
-This checks Express connectivity only, not Chromium or model readiness. The `phase: 0` field is preserved for compatibility with the original health contract; it is not the product milestone. `POST /api/scan` and `POST /api/generate-fix` are implemented. `GET /api/demo`, applying changes and reset remain unimplemented and return JSON 404 errors. Ordinary source views use Vite raw imports; proposal review uses the exact original source returned with that proposal.
+This checks Express connectivity only, not Chromium or model readiness. The `phase: 0` field is preserved for compatibility with the original health contract; it is not the product milestone. `POST /api/scan`, `POST /api/generate-fix`, `POST /api/apply-and-verify` and `POST /api/reset` are implemented. `GET /api/demo` remains reserved and returns a JSON 404 error. Ordinary source views use Vite raw imports; proposal review uses the exact original source returned with that proposal.
 
 To run each process in a separate terminal:
 
@@ -252,21 +252,23 @@ npm run check
 
 This runs ESLint, Node's built-in tests and a production client build. Tests cover the existing scanner/configuration/HTTP behavior plus mocked Ollama request/response handling, prompt construction, JSX validation and proposal lifecycle. Individual commands are `npm run lint`, `npm test` and `npm run build`. Unit/HTTP tests require neither Chromium nor Ollama; they do not prove that local inference works. Use the live scan → generate → review journey to exercise the installed model.
 
-For a manual Phase 3 smoke test:
+For a manual Phase 5 smoke test:
 
 1. Start both processes with `npm run dev`.
 2. Visit the client and confirm the dashboard, login iframe and actual code panels render. The API status should reflect a real health request.
 3. Open `/preview` directly. It should show only the login demo, with no dashboard navigation or source panels. Try the password visibility toggle and submit the form; the demo stays local and sends no credentials.
-4. Select **Scan Accessibility** and inspect the genuine findings. Confirm **Generate AI Fix** is enabled only for a completed scan with violations.
+4. Enable **Ghost Mode**, select **Scan Accessibility** and inspect the genuine findings. Confirm the haunted findings list contains only the completed axe report and **Generate AI Fix** is enabled only for a completed scan with violations.
 5. Generate a proposal and observe loading, model information and returned JSX. Review it, explicitly approve it, then use **Apply & Verify**. The server applies only supported changes and runs a genuine after-scan; unsupported model output is rejected. Use **Reset Demo** to restore the trusted original and start again.
 6. Use only the keyboard to follow the skip link, dashboard navigation, preview link and available controls. Focus should remain visible. Resize to a narrow mobile width and confirm the dashboard remains usable, with code scrolling inside its panel.
 7. Start another scan. Confirm the old proposal is invalidated, the original baseline remains and the after card stays unverified. Compare both demo files before and after generation; their bytes must be unchanged.
-8. Visit `/api/health`, try the PowerShell scan/generate sequence, and exercise a service failure. An unavailable Ollama or invalid response must produce a useful error and retry path, never fabricated JSX. Restarting Express requires a new scan. Apply/reset endpoints must still return JSON 404 errors.
+8. Visit `/api/health`, try the PowerShell scan/generate sequence, and exercise a service failure. An unavailable Ollama or invalid response must produce a useful error and retry path, never fabricated JSX. Restarting Express requires a new scan. Apply and reset must return explicit JSON errors when their preconditions are not met.
 9. Stop both processes with Ctrl+C.
 
 The intentional accessibility defects are restricted to `OriginalDemo.jsx` and `ActiveDemo.jsx`: the email and password fields lack accessible names, the icon-only password toggle lacks an accessible name, and helper text has low contrast. Their visual field captions are deliberately not associated labels. The demo is unchanged from Phase 1; do not use it as a production login example.
 
 Automated scanning cannot establish full WCAG compliance. A successful scan with no violations says **“No accessibility violations were detected by the automated scan.”** It does not prove that labels are meaningful, keyboard behavior is correct in every state or the full experience works with assistive technology. Review incomplete results and continue manual keyboard and screen-reader testing.
+
+Ghost Mode is a presentation layer over the real scan and verification reports. It labels findings as **Ghost Detected**, **Awaiting Permission**, **Ghost Removed**, **Still Haunting** or **New Apparition** only when the corresponding rule IDs exist in those reports. It does not change source files, scan configuration or approval behavior.
 
 Phase 2 validation passed `npm run check` (lint, 27 tests and the production build). Real dashboard scans with bundled Chromium, including successful rescans, displayed 3 violated rules across 4 elements with expandable guidance and actual selectors. Keyboard navigation and layouts at 320, 390, 760, 900 and 1280 px were checked. Scan loading disabled repeated frontend requests, the backend rejected overlap with 409, and the first baseline timestamp remained unchanged after rescans and errors. Explicitly intercepted responses exercised API/network failures, malformed reports and zero-violation/incomplete-result UI states without changing the demo; genuine scan results were restored afterward. Dashboard axe checks excluded the intentional demo iframe and passed with expanded findings, hovered controls and mobile layout. All three scanner browsers disconnected after completion, and both demo files retained their original bytes. Real Playwright failure-path checks also covered a missing executable, an unavailable preview, an unfollowed redirect and a render timeout, with all failure-path browsers closed. Browser-close failures are retried and reported rather than silently treated as successful cleanup. These checks do not implement AI fixes or establish full WCAG compliance.
 
@@ -321,7 +323,11 @@ server/
       validateProposal.js      Text normalization and JSX/policy checks
       fixGenerator.js          Current-source generation orchestration
   test/                        Configuration, scanner, AI, validation and HTTP checks
-docs/architecture.md           Planned APIs, trust boundaries and phase gates
+docs/architecture.md           APIs, trust boundaries and phase gates
+docs/demo-script.md             Reproducible 90–120 second demonstration
+docs/demo-results.md            Recorded local validation and limitations
+docs/hacktoberfest-week4-submission.md
+                                Submission draft with verified claims only
 ```
 
 | Phase | Scope | Status |

@@ -16,6 +16,7 @@ const paths = {
   layers: <><path d="m12 3 10 5-10 5L2 8Zm-9 9 9 5 9-5m-18 5 9 5 9-5" /></>,
   terminal: <><path d="m4 6 6 6-6 6m9 0h7" /></>,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  ghost: <><path d="M5 20V10a7 7 0 0 1 14 0v10l-3-2-2 2-2-2-2 2-2-2Z" /><path d="M9 11h.01M15 11h.01" /></>,
 };
 
 export default function Icon({ name, size = 18, className = '' }) {

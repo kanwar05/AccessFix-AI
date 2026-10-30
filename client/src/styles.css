@@ -176,6 +176,30 @@ h1 { margin: 0; font-size: clamp(25px, 2.5vw, 36px); font-weight: 600; line-heig
 .issues-footnote { display: flex; align-items: flex-start; gap: 9px; padding: 15px 21px; border-top: 1px solid var(--border); background: #16171d; color: #acafc2; font-size: 11px; line-height: 1.9; }
 .issues-footnote > svg { margin-top: 3px; color: #a5a2b8; }
 .issues-footnote strong { font-weight: 400; color: #bcb8cc; }
+.issues-heading-actions { display: flex; align-items: center; gap: 10px; }
+.ghost-toggle { display: inline-flex; align-items: center; gap: 7px; color: #c9b9e8; font-size: 10px; font-weight: 550; cursor: pointer; }
+.ghost-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.ghost-toggle-track { display: inline-flex; align-items: center; width: 29px; height: 17px; padding: 2px; border: 1px solid #62517c; border-radius: 999px; background: #282337; }
+.ghost-toggle-track span { width: 11px; height: 11px; border-radius: 50%; background: #aaa0c5; transition: transform 150ms, background-color 150ms; }
+.ghost-toggle input:checked + .ghost-toggle-track { background: #5b3e74; border-color: #b18bce; }
+.ghost-toggle input:checked + .ghost-toggle-track span { transform: translateX(12px); background: #f0c4e7; }
+.ghost-toggle input:focus-visible + .ghost-toggle-track { outline: 3px solid var(--cyan); outline-offset: 3px; }
+.ghost-mode-intro { margin: 0 0 16px; padding: 13px 14px; border: 1px solid #60436e; border-radius: 8px; background: linear-gradient(120deg, #261d35, #211d2b); color: #cfc3dd; }
+.ghost-mode-title { display: flex; align-items: center; gap: 8px; color: #f0d7ee; font-size: 12px; }
+.ghost-emblem, .ghost-mark { color: #e6a8d7; }
+.ghost-mode-intro p { margin: 5px 0 10px; font-size: 11px; line-height: 1.65; }
+.ghost-legend { display: flex; flex-wrap: wrap; gap: 7px 13px; color: #b9adc7; font-size: 10px; }
+.ghost-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ghost-legend-dot { width: 6px; height: 6px; border-radius: 50%; background: #c59bd2; }
+.ghost-legend-dot.proposed { background: #e5bf8b; }
+.ghost-legend-dot.resolved { background: #8bc8ac; }
+.ghost-finding-status { display: flex; gap: 8px; margin-bottom: 13px; padding: 9px 10px; border-left: 2px solid #ba8dc6; background: #292134; color: #cbbfd2; font-size: 11px; line-height: 1.55; }
+.ghost-finding-status strong { color: #f0d7ee; font-size: 11px; font-weight: 600; }
+.ghost-status-remaining { border-color: #e0b477; background: #30271f; }
+.ghost-status-introduced { border-color: #e79c9c; background: #322129; }
+.ghost-status-resolved { border-color: #8bc8ac; background: #20302b; }
+.ghost-proposal-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 13px; color: #d3b9e8; font-size: 11px; }
+.ghost-proposal-link:hover { color: #f0d7ee; text-decoration: underline; }
 
 .page-section { margin-top: 36px; }
 .section-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin-bottom: 18px; }
