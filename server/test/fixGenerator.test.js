@@ -9,7 +9,7 @@ import { createFixGenerator } from '../src/services/fixGenerator.js';
 const code = 'export default function Login() { return <main><label htmlFor="email">Email</label><input id="email" /></main>; }';
 const hash = (source) => createHash('sha256').update(source).digest('hex');
 const config = createConfig({ OLLAMA_TIMEOUT_MS: '1000' });
-const source = 'export default function Login() { return <main><input id="email" /></main>; }';
+const source = 'export default function Login() { return <main><p>Email</p><input id="email" /></main>; }';
 function scanFor(text = source) {
   return {
     status: 'completed', scanId: 'generator-test-scan', sourceHash: hash(text),
@@ -23,20 +23,19 @@ function scanFor(text = source) {
 
 test('fix generation reads the controlled file, returns a validated proposal and leaves both demo files unchanged', async () => {
   const before = await Promise.all([readFile(demoPaths.original), readFile(demoPaths.active)]);
-  const active = before[1].toString('utf8');
   const generate = createFixGenerator(config, { chat: async (messages) => {
-    assert.ok(messages[1].content.includes(active));
+    assert.ok(messages[1].content.includes(source));
     assert.ok(messages[1].content.includes('label'));
     return { model: 'test-model', content: `\n\`\`\`jsx\n${code}\n\`\`\`\n` };
-  } });
-  const report = await generate(scanFor(active));
+  }, readSource: async () => source });
+  const report = await generate(scanFor(source));
   assert.equal(report.status, 'proposed');
   assert.match(report.proposalId, /^[a-f\d-]{36}$/);
   assert.ok(Number.isFinite(Date.parse(report.generatedAt)));
   assert.equal(report.model, 'test-model');
-  assert.equal(report.originalCode, active);
+  assert.equal(report.originalCode, source);
   assert.equal(report.proposedCode, code);
-  assert.equal(report.sourceHash, hash(active));
+  assert.equal(report.sourceHash, hash(source));
   assert.equal(report.scanId, 'generator-test-scan');
   assert.equal(report.applied, false);
   assert.equal(report.verified, false);
@@ -99,6 +98,21 @@ test('unsupported model code is rejected without execution or a fallback patch',
   });
   await assert.rejects(generate(scanFor()), (error) => error.code === 'UNSUPPORTED_AI_CODE');
   assert.equal(calls, 2);
+});
+
+test('a model edit plan is applied to the original source and safety-checked', async () => {
+  const generate = createFixGenerator(config, {
+    readSource: async () => source,
+    chat: async () => ({
+      model: 'test-model',
+      content: JSON.stringify({
+        edits: [{ find: '<p>Email</p>', replace: '<label htmlFor="email">Email</label>' }],
+      }),
+    }),
+  });
+  const report = await generate(scanFor());
+  assert.equal(report.proposedCode, code);
+  assert.equal(report.originalCode, source);
 });
 
 test('service errors are not retried and the total generation deadline bounds all model work', async () => {

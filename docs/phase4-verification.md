@@ -11,7 +11,7 @@ npm run build
 npm run check
 ```
 
-The Phase 4 implementation currently has 65 passing server tests. The suite covers the AST allowlist, successful apply and verification, stale and duplicate approvals, verification failure rollback, reset, source immutability, scanner behavior, Ollama failures and the Phase 1-3 regression suite.
+The Phase 4 implementation currently has 68 passing server tests. The suite covers the AST allowlist, successful apply and verification, stale and duplicate approvals, verification failure rollback, reset, source immutability, scanner behavior, Ollama failures, structured edit plans and the Phase 1-3 regression suite.
 
 ## Real local workflow
 
@@ -41,13 +41,13 @@ Observed results:
 | Reset before scan | Passed; preview rendered |
 | Baseline scan | Passed; 3 rules, 4 affected elements |
 | Baseline rules | `button-name`, `color-contrast`, `label` |
-| Real Ollama generation | Passed; model `qwen2.5-coder:1.5b`, proposal returned |
-| Apply and verify | Blocked by `UNSUPPORTED_PROPOSED_CHANGE` |
+| Real Ollama generation | Blocked; `qwen2.5-coder:1.5b` returned edit plans whose `find` fragments did not match the controlled source |
+| Apply and verify | Not offered because generation-time validation rejected the proposal |
 | Reset after blocked apply | Passed; preview rendered |
 | Rescan after reset | Passed; 3 rules, 4 affected elements |
 | Rescan rules | `button-name`, `color-contrast`, `label` |
 
-The generated proposal was valid JSX, but the model changed visible component content outside the restricted accessibility-only AST policy. The proposal was not applied, no verification success was claimed, and the active demo remained unchanged. This is an intentional security outcome, not a failed accessibility assertion.
+The model was first asked for a minimal exact-string edit plan and was given verbatim source anchors. It still returned axe-rendered/browser HTML fragments and replacements that changed wrappers or visible content; the bounded correction returned another non-matching fragment. Generation therefore failed with `INVALID_AI_EDIT_PLAN`, before approval or apply. The proposal was not applied, no verification success was claimed, and the active demo remained unchanged. This is an intentional security outcome, not a failed accessibility assertion. The installed `qwen2.5-coder:7b` model exhibited the same full-module restructuring behavior in a separate evaluation.
 
 ## Acceptance status
 
@@ -63,4 +63,4 @@ The generated proposal was valid JSX, but the model changed visible component co
 - [ ] Real model proposal accepted and applied.
 - [ ] Real before/after accessibility improvement recorded.
 
-The final two items remain blocked until the configured model produces a proposal within the narrow allowlist. The correct response is regeneration or prompt refinement, not weakening the policy.
+The final two items remain blocked until a configured local model produces exact source edits within the narrow allowlist. The correct response is bounded regeneration or prompt refinement, not weakening the policy.

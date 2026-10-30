@@ -5,8 +5,11 @@ import { ScanError } from '../errors.js';
 import { buildRepairPrompt } from './buildRepairPrompt.js';
 import { createOllamaClient } from './ollamaClient.js';
 import { validateProposal } from './validateProposal.js';
+import { assertSafeProposal } from './applyProposal.js';
+import { applyStructuredRepairEdits } from './structuredRepair.js';
 
 const sourceHash = (source) => createHash('sha256').update(source).digest('hex');
+const looksLikeStructuredEdits = (content) => /^\s*(?:\{\s*"edits"|\s*```json)/i.test(content);
 
 export function assertRepairScan(scan) {
   if (
@@ -24,6 +27,7 @@ export function createFixGenerator(config, dependencies = {}) {
   const readSource = dependencies.readSource ?? (() => readFile(demoPaths.active, 'utf8'));
   const chat = dependencies.chat ?? createOllamaClient(config);
   const validate = dependencies.validate ?? validateProposal;
+  const validateSafety = dependencies.validateSafety ?? assertSafeProposal;
 
   return async function generateFix(scan, { signal } = {}) {
     assertRepairScan(scan);
@@ -53,14 +57,19 @@ export function createFixGenerator(config, dependencies = {}) {
         controller.signal.throwIfAborted();
         model = response.model;
         try {
-          proposedCode = validate(response.content, { maxCodeBytes: config.aiMaxCodeBytes });
+          proposedCode = looksLikeStructuredEdits(response.content)
+            ? applyStructuredRepairEdits(originalCode, response.content)
+            : validate(response.content, { maxCodeBytes: config.aiMaxCodeBytes });
+          validateSafety(originalCode, proposedCode);
           break;
         } catch (error) {
-          if (attempt === 1 || !['INVALID_AI_CODE', 'UNSUPPORTED_AI_CODE'].includes(error.code)) throw error;
+          if (attempt === 1 || !['INVALID_AI_CODE', 'UNSUPPORTED_AI_CODE', 'INVALID_AI_EDIT_PLAN'].includes(error.code)) throw error;
           // One correction request to the real model; never substitute a prepared patch.
           messages.push(
             { role: 'assistant', content: response.content },
-            { role: 'user', content: `Your previous module was rejected: ${error.message}\nReturn the complete corrected JSX module only. Preserve the original demo behavior and fix the supplied scan findings. Do not add unsupported capabilities.` },
+            { role: 'user', content: `Your previous module was rejected by the syntax or apply safety validator: ${error.message}
+Return a JSON object only in this exact shape: {"edits":[{"find":"exact source fragment","replace":"replacement fragment"}]}.
+Use one to eight exact, unique string replacements against the supplied source. Make only these allowlisted edits: add a static aria-label, add a static htmlFor, add a static id, convert the visible form-label <p> to <label>, or change styles.helper.color to a static six-digit hex value. Preserve every other character and all wrapper elements. Do not change visible text, add elements, restructure JSX, change handlers, change unrelated styles, add imports, or add executable logic.` },
           );
         }
       }
