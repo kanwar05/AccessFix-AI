@@ -127,7 +127,7 @@ verified: false
 
 `validateProposal.js` trims whitespace, strips one complete surrounding Markdown fence if present and parses JSX with `@babel/parser`. It requires exactly one default-exported synchronous React function component that returns JSX. The exported `PROPOSAL_POLICY` explicitly limits imports to React and rejects module-scope effects, non-pure constants, classes/constructors, asynchronous/generator constructs, dynamic imports/execution, process/filesystem/network/browser-storage/global capabilities, embedded scripts/documents, executable HTML injection and external resource/form/link targets. Normal inline styles, JSX, React hooks and local event handlers remain supported. The policy is deliberately limited to this demo, not a complete JavaScript sandbox.
 
-Phase 3 only displays and copies proposal text. It does not evaluate or compile that text, mount it in an iframe, scan it, write component files or claim that accessibility issues are fixed. The preview is still the unchanged active demo. Future Phase 4 must revalidate the stored proposal and source association before any explicitly approved write, then perform genuine verification and recovery.
+Phase 4 applies only an explicitly approved, source-bound proposal through a restricted AST policy. The preview remains unchanged until apply succeeds; generated code is never executed by the API. Apply and reset are serialized with scans, and any failed verification restores the previous active source.
 
 Expected generation errors include unavailable/missing Ollama/model (503), timeout (504), model/protocol/oversize failures (502), missing/stale/busy scan or generation association (409), no detected violations or invalid/unsupported JSX (422), unsupported input (400/403/415) and unexpected orchestration failures (500). These failures have no prepared JSX fallback. See the [generation workflow and commands](../README.md#generate-an-ai-proposal).
 
@@ -141,13 +141,20 @@ Expected generation errors include unavailable/missing Ollama/model (503), timeo
 
 For a completed scan with zero violations, use **“No accessibility violations were detected by the automated scan.”** Automated testing does not establish full WCAG compliance; review incomplete checks and continue keyboard, screen-reader and other manual assessments.
 
-## Future Phase 4 approval and safe application
+## Phase 4 approval and safe application
 
 1. Require the user's explicit Apply & Verify action for a stored proposal; generation alone never grants approval.
 2. Revalidate the complete proposed module and its allowed capabilities. **Parsing JSX is not a sandbox**, so Phase 3 acceptance must not be treated as proof that arbitrary code is safe to run.
 3. Serialize source-changing operations, recheck the source fingerprint and preserve the previous source before replacing only `ActiveDemo.jsx`.
 4. Wait for Vite to compile and the updated preview to render. Detect compilation errors, runtime exceptions and failed readiness before running the same accessibility scan again.
 5. If application, compilation, rendering or verification fails, restore the preserved source and confirm that the previous preview renders. Report both the primary failure and rollback outcome. Never overwrite `OriginalDemo.jsx` or substitute a hand-written repair.
+
+The implemented endpoints are:
+
+- `POST /api/apply-and-verify` with `{ "proposalId": "...", "scanId": "...", "approved": true }`. It returns actual before/after scan reports and a comparison containing resolved, remaining and introduced rule IDs.
+- `POST /api/reset` with an empty body. It restores trusted `OriginalDemo.jsx` content into `ActiveDemo.jsx`, verifies that the preview renders, and clears stored scan/proposal state.
+
+The apply AST policy allows only static `aria-label`, `htmlFor` and `id` additions, the controlled `p`-to-`label` conversion, and one static six-digit hexadecimal change to `styles.helper.color`. It rejects imports, logic, event-handler changes, executable expressions, arbitrary style changes and structural JSX changes. The single-demo operation guard serializes scan, apply and reset operations.
 
 Use bounded timeouts and close browser contexts on all paths. Distinguish service-unavailable, timeout, malformed-model-output, stale-candidate, validation, browser and rollback errors so the dashboard can explain a useful next step.
 
@@ -159,7 +166,7 @@ Use bounded timeouts and close browser contexts on all paths. Distinguish servic
 | **1 — Frontend dashboard and demo** | Implemented: accessible dashboard, deliberately buggy baseline, active component, isolated preview and Vite raw source loading. | Check frontend build, dashboard/preview rendering and health proxy; summarize and stop. |
 | **2 — Accessibility detection engine** | Implemented: fixed-target Playwright/axe scan, genuine issue details, count/severity reporting and in-memory baseline. | Exercise baseline scan, repeatable configuration, failure/concurrency paths and source immutability; summarize and stop. |
 | **3 — AI-generated fix engine** | Implemented: local Ollama HTTP inference, actual-source/findings prompt, JSX/policy validation, stored proposal association and side-by-side text review. | Exercise model success and unavailable/timeout/malformed output paths; confirm generation leaves the source unchanged; summarize and stop. |
-| **4 — Apply-and-verify workflow** | Explicit approval, stale-source protection, controlled writes, rollback, genuine verification and reset. | Exercise the complete workflow and failed-application recovery; summarize and stop. |
+| **4 — Apply-and-verify workflow** | Implemented: explicit approval, stale-source protection, restricted AST allowlist, controlled writes, rollback, genuine verification and reset. | Exercise the complete workflow and failed-application recovery; summarize and stop. |
 | **5 — Testing, documentation and demo preparation** | Integration checks, manual accessibility checks, troubleshooting and reproducible demo instructions. | Demonstrate Detect → Fix → Verify with the real local model and actual scan reports. |
 
 No phase includes arbitrary repository uploads, user-provided scan URLs, authentication, databases, payments or cloud deployment. Do not begin the next phase until the user requests it.

@@ -2,7 +2,7 @@
 
 A local React accessibility repair assistant built around **Detect → Generate → Review → Approve → Apply → Verify**.
 
-**Current milestone: Phase 3 — AI proposal generation.** The dashboard scans its controlled React login preview with headless Chromium and axe-core, then sends the actual source and genuine findings to local Ollama for a complete JSX proposal. The proposal is parsed and checked before being displayed alongside its original source. **No generated code is applied, compiled, imported or executed.** Reset and after-repair verification remain Phase 4 work.
+**Current milestone: Phase 4 — Apply and verify.** The dashboard scans its controlled React login preview with headless Chromium and axe-core, sends the actual source and genuine findings to local Ollama, then lets the user explicitly approve a restricted JSX proposal. The server applies only allowlisted accessibility changes, reruns the same scan, reports before/after results, rolls back failures, and can reset the active demo to the trusted original. Real model output that falls outside the allowlist is rejected.
 
 ## Requirements
 
@@ -112,7 +112,7 @@ The response includes:
 
 Each finding retains `id`, `help`, `description`, `recommendedAction`, `impact`, `tags`, `wcagTags`, `helpUrl`, its affected-element count and `nodes`. Nodes retain the actual axe `target`, `html`, impact, `failureSummary` and `checks` (`any`, `all`, `none`) with engine-provided guidance. Counts for rules and elements are intentionally separate.
 
-The first successful scan becomes the frontend baseline. Later successes update the latest findings without replacing that initial baseline; errors do not overwrite either successful report. A failed rescan clearly labels retained previous findings. Reloading the dashboard clears this in-memory state. The before card can display this real baseline, while the after card remains **Not verified** until Phase 4. Scanning reads source for identification and does not rewrite it.
+The first successful scan becomes the frontend baseline. Later successes update the latest findings without replacing that initial baseline; errors do not overwrite either successful report. A failed rescan clearly labels retained previous findings. Applying a proposal replaces the current report with the genuine after-scan while retaining the before comparison. Reset clears this in-memory state and requires a new scan. Scanning reads source for identification and does not rewrite it.
 
 ### Observed Phase 2 scan
 
@@ -225,7 +225,7 @@ The validator trims surrounding whitespace, removes one surrounding Markdown fen
 
 The explicit prototype policy permits ordinary React imports, pure module-level constants/functions and JSX components. Unsupported constructs include imports from other packages, dynamic imports, classes, constructors, async/generator constructs, module-scope effects, dynamic execution, network/filesystem/process/browser-storage capabilities, browser-global access, embedded documents/scripts, executable HTML injection, external resource/form targets and non-fragment links. See `PROPOSAL_POLICY` in `server/src/services/validateProposal.js` for the full list. This intentionally narrow policy may reject code that would be acceptable in a general React application.
 
-**Parsing and this policy are not a JavaScript sandbox or an accessibility verification.** Phase 3 never evaluates, renders, builds or scans the proposed module. An accepted proposal may still change behavior or leave accessibility issues; review is required, and verification belongs to Phase 4. `OriginalDemo.jsx` and `ActiveDemo.jsx` are not modified. **Apply & Verify** and **Reset Demo** remain disabled.
+**Parsing and this policy are not a JavaScript sandbox or an accessibility verification.** The apply endpoint adds a second AST comparison and permits only static accessibility attributes, the controlled label conversion and the helper color update. It never evaluates generated code. An applied proposal may still leave accessibility issues; the dashboard reports the actual after-scan rather than claiming compliance. `OriginalDemo.jsx` is never modified.
 
 ### Generation errors
 
@@ -258,7 +258,7 @@ For a manual Phase 3 smoke test:
 2. Visit the client and confirm the dashboard, login iframe and actual code panels render. The API status should reflect a real health request.
 3. Open `/preview` directly. It should show only the login demo, with no dashboard navigation or source panels. Try the password visibility toggle and submit the form; the demo stays local and sends no credentials.
 4. Select **Scan Accessibility** and inspect the genuine findings. Confirm **Generate AI Fix** is enabled only for a completed scan with violations.
-5. Generate a proposal and observe loading, model information and returned JSX. Confirm the warning label says it has not been applied or verified, and copy the proposal. The iframe must still display the original component. **Apply & Verify** and **Reset Demo** remain disabled.
+5. Generate a proposal and observe loading, model information and returned JSX. Review it, explicitly approve it, then use **Apply & Verify**. The server applies only supported changes and runs a genuine after-scan; unsupported model output is rejected. Use **Reset Demo** to restore the trusted original and start again.
 6. Use only the keyboard to follow the skip link, dashboard navigation, preview link and available controls. Focus should remain visible. Resize to a narrow mobile width and confirm the dashboard remains usable, with code scrolling inside its panel.
 7. Start another scan. Confirm the old proposal is invalidated, the original baseline remains and the after card stays unverified. Compare both demo files before and after generation; their bytes must be unchanged.
 8. Visit `/api/health`, try the PowerShell scan/generate sequence, and exercise a service failure. An unavailable Ollama or invalid response must produce a useful error and retry path, never fabricated JSX. Restarting Express requires a new scan. Apply/reset endpoints must still return JSON 404 errors.
@@ -330,12 +330,12 @@ docs/architecture.md           Planned APIs, trust boundaries and phase gates
 | 1 | Frontend dashboard, controlled demo, `/preview`, raw source loading | Implemented |
 | 2 | Real Playwright/axe detection and issue reporting | Implemented |
 | 3 | Real Ollama generation, JSX validation and code review | Implemented |
-| 4 | Approved apply, rollback, rescan and reset | Awaiting request |
+| 4 | Approved apply, rollback, rescan and reset | Implemented; real model acceptance remains blocked by the safety allowlist |
 | 5 | Integration tests, documentation and demo preparation | Awaiting request |
 
 See [the architecture document](docs/architecture.md) for API contracts and the apply/rollback design. Each phase ends with checks, a milestone summary and a stop until the next phase is requested.
 
-Phase 3 generates reviewable proposals only. Approved file application, rollback, scans against proposed code, after-repair verification and reset remain Phase 4 work. Do not treat a generated or syntax-validated proposal as a successful accessibility repair.
+Phase 4 adds `POST /api/apply-and-verify` and `POST /api/reset`. Apply requires `{ "proposalId": "...", "scanId": "...", "approved": true }`; source freshness, proposal identity and a narrow AST allowlist are checked before only `ActiveDemo.jsx` is replaced. Verification runs the real Playwright/axe scanner, and failures restore the pre-apply source. A generated or syntax-validated proposal is never treated as a successful accessibility repair without a completed verification scan.
 
 ## Prototype boundaries
 

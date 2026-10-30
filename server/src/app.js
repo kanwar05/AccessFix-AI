@@ -3,14 +3,21 @@ import { createConfig } from './config.js';
 import { ScanError } from './errors.js';
 import { createAccessibilityScanner } from './services/accessibilityScanner.js';
 import { assertRepairScan, createFixGenerator } from './services/fixGenerator.js';
+import { compareVerification, createApplyService, hashSource } from './services/applyProposal.js';
+import { readFile } from 'node:fs/promises';
+import { demoPaths } from './config.js';
 
 export function createApp({
   config = createConfig(), scan = createAccessibilityScanner(config),
   generateFix = createFixGenerator(config),
+  applyService = createApplyService(),
+  readActiveSource = () => readFile(demoPaths.active, 'utf8'),
+  readOriginalSource = () => readFile(demoPaths.original, 'utf8'),
 } = {}) {
   const app = express();
   let scanInProgress = false;
   let generationJob = null;
+  let operationInProgress = null;
   // One controlled component: retain only its current scan, first baseline and current proposal.
   const session = { revision: 0, scan: null, baseline: null, proposal: null };
   app.disable('x-powered-by');
@@ -45,6 +52,10 @@ export function createApp({
     if (scanInProgress) {
       res.set('Retry-After', '2');
       return next(new ScanError(409, 'SCAN_IN_PROGRESS', 'A scan is already running. Wait for it to finish, then try again.'));
+    }
+    if (operationInProgress) {
+      res.set('Retry-After', '2');
+      return next(new ScanError(409, 'OPERATION_IN_PROGRESS', 'Another demo operation is already running. Wait for it to finish, then try again.'));
     }
 
     scanInProgress = true;
@@ -82,7 +93,7 @@ export function createApp({
     ) {
       return next(new ScanError(400, 'INVALID_GENERATION_INPUT', 'Send only { "scanId": "the latest completed scan identifier" }. Source, findings, URLs and paths are not accepted.'));
     }
-    if (scanInProgress) {
+    if (scanInProgress || operationInProgress) {
       return next(new ScanError(409, 'SCAN_IN_PROGRESS', 'Wait for the current scan to complete before generating a proposal.'));
     }
     if (generationJob) {
@@ -124,6 +135,102 @@ export function createApp({
     } finally {
       res.removeListener('close', cancelDisconnected);
       if (generationJob === job) generationJob = null;
+    }
+  });
+
+  app.post('/api/apply-and-verify', async (req, res, next) => {
+    if ((req.get('Origin') && req.get('Origin') !== config.clientOrigin) || req.get('Sec-Fetch-Site') === 'cross-site') {
+      return next(new ScanError(403, 'ORIGIN_NOT_ALLOWED', 'Apply proposals from the configured local dashboard.'));
+    }
+    if (!req.is('application/json') || !req.body || Array.isArray(req.body) ||
+      Object.keys(req.body).length !== 3 || typeof req.body.proposalId !== 'string' ||
+      typeof req.body.scanId !== 'string' || req.body.approved !== true) {
+      return next(new ScanError(400, 'INVALID_APPROVAL_INPUT', 'Send proposalId, scanId and approved: true for an explicit approval.'));
+    }
+    if (scanInProgress || generationJob || operationInProgress) {
+      return next(new ScanError(409, 'OPERATION_IN_PROGRESS', 'Another demo operation is already running. Wait for it to finish, then try again.'));
+    }
+    if (!session.proposal || !session.scan) {
+      return next(new ScanError(409, 'PROPOSAL_REQUIRED', 'Generate a current AI proposal before applying a fix.'));
+    }
+    if (req.body.proposalId !== session.proposal.proposalId || req.body.scanId !== session.scan.scanId) {
+      return next(new ScanError(409, 'STALE_PROPOSAL', 'This proposal is no longer current. Scan and generate a new proposal.'));
+    }
+
+    operationInProgress = 'apply';
+    const proposal = session.proposal;
+    const before = session.scan;
+    try {
+      const originalCode = await readActiveSource();
+      if (hashSource(originalCode) !== proposal.sourceHash || hashSource(originalCode) !== before.sourceHash) {
+        throw new ScanError(409, 'STALE_SOURCE', 'The active component changed since this proposal was generated. Scan and generate again.');
+      }
+      const applied = await applyService.apply(originalCode, proposal.proposedCode);
+      let after;
+      try {
+        after = await scan();
+      } catch (error) {
+        await applyService.restore(originalCode);
+        throw new ScanError(422, 'APPLY_ROLLED_BACK', 'The proposal was rolled back because the updated preview failed to compile, render, or scan.', { cause: error });
+      }
+      if (hashSource(await readActiveSource()) !== applied.sourceHash) {
+        await applyService.restore(originalCode);
+        throw new ScanError(422, 'APPLY_ROLLED_BACK', 'The proposal was rolled back because the active source changed during verification.');
+      }
+      const verification = compareVerification(before, after);
+      session.revision++;
+      session.scan = after;
+      session.proposal = { ...proposal, applied: true, verified: true };
+      res.set('Cache-Control', 'no-store').json({
+        status: verification.status, model: proposal.model, proposalId: proposal.proposalId,
+        appliedAt: new Date().toISOString(), applied: true, verified: true,
+        beforeScan: before, afterScan: after, verification,
+      });
+    } catch (error) {
+      next(error instanceof ScanError ? error : new ScanError(
+        500, 'APPLY_FAILED', 'The approved proposal could not be applied. No successful verification was recorded.', { cause: error },
+      ));
+    } finally {
+      operationInProgress = null;
+    }
+  });
+
+  app.post('/api/reset', async (req, res, next) => {
+    if ((req.get('Origin') && req.get('Origin') !== config.clientOrigin) || req.get('Sec-Fetch-Site') === 'cross-site') {
+      return next(new ScanError(403, 'ORIGIN_NOT_ALLOWED', 'Reset the demo from the configured local dashboard.'));
+    }
+    if (!req.is('application/json') && Number(req.get('Content-Length') || 0) > 0) {
+      return next(new ScanError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Reset accepts an empty request body.'));
+    }
+    if (req.body && (Array.isArray(req.body) || Object.keys(req.body).length > 0) || Object.keys(req.query).length > 0) {
+      return next(new ScanError(400, 'INVALID_RESET_INPUT', 'Reset accepts no parameters.'));
+    }
+    if (scanInProgress || generationJob || operationInProgress) {
+      return next(new ScanError(409, 'OPERATION_IN_PROGRESS', 'Another demo operation is already running. Wait for it to finish, then try again.'));
+    }
+    operationInProgress = 'reset';
+    try {
+      const originalCode = await readOriginalSource();
+      await applyService.restore(originalCode);
+      try {
+        const resetScan = await scan();
+        session.revision++;
+        session.scan = null;
+        session.baseline = null;
+        session.proposal = null;
+        res.set('Cache-Control', 'no-store').json({
+          status: 'reset', resetAt: new Date().toISOString(), sourceHash: resetScan.sourceHash,
+          verification: { status: 'preview-rendered', scan: resetScan },
+        });
+      } catch (error) {
+        throw new ScanError(422, 'RESET_FAILED', 'The demo was restored but the original preview could not be verified.', { cause: error });
+      }
+    } catch (error) {
+      next(error instanceof ScanError ? error : new ScanError(
+        500, 'RESET_FAILED', 'The controlled demo could not be reset.', { cause: error },
+      ));
+    } finally {
+      operationInProgress = null;
     }
   });
 

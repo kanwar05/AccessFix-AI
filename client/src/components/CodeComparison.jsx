@@ -16,7 +16,7 @@ function GenerateButton({ canGenerate, isGenerating, onGenerate }) {
   );
 }
 
-export default function CodeComparison({ scan, isScanning, scanError, proposal, isGenerating, error, canGenerate, onGenerate }) {
+export default function CodeComparison({ scan, isScanning, scanError, proposal, isGenerating, isApplying, error, canGenerate, canApply, onGenerate, onApply }) {
   const [version, setVersion] = useState('original');
   const source = proposal ? proposal.originalCode : version === 'original' ? originalSource : activeSource;
   const fileName = proposal || version === 'active' ? 'ActiveDemo.jsx' : 'OriginalDemo.jsx';
@@ -86,6 +86,16 @@ export default function CodeComparison({ scan, isScanning, scanError, proposal, 
               />
               <div className="proposal-actions">
                 <GenerateButton canGenerate={canGenerate} isGenerating={isGenerating} onGenerate={onGenerate} />
+                {canApply && (
+                  <button
+                    type="button" className="button button-primary" disabled={isApplying}
+                    onClick={() => {
+                      if (window.confirm('Apply this approved proposal to the local ActiveDemo component and run verification?')) onApply();
+                    }}
+                  >
+                    {isApplying ? 'Applying & verifying…' : 'Approve & Apply'}
+                  </button>
+                )}
                 <p id="generate-help" className="generation-help">{generationHelp}</p>
               </div>
             </>
@@ -107,8 +117,12 @@ export default function CodeComparison({ scan, isScanning, scanError, proposal, 
       <div className="review-footer">
         <p><Icon name="shield" size={17} />A proposal is a suggestion, not a verified accessibility fix.</p>
         <div className="apply-control">
-          <span id="apply-help">Apply and verification are not connected · Phase 4</span>
-          <button type="button" className="button button-secondary" disabled aria-describedby="apply-help"><Icon name="check" size={17} />Apply &amp; Verify</button>
+          <span id="apply-help">{proposal?.applied ? 'Applied and verified below.' : 'Approve the reviewed proposal above to modify the local demo.'}</span>
+          <button type="button" className="button button-secondary" disabled={!canApply || isApplying} aria-describedby="apply-help" onClick={() => {
+            if (window.confirm('Apply this approved proposal to the local ActiveDemo component and run verification?')) onApply();
+          }}>
+            <Icon name="check" size={17} />{isApplying ? 'Applying…' : 'Apply & Verify'}
+          </button>
         </div>
       </div>
     </section>

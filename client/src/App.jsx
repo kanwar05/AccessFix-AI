@@ -16,8 +16,8 @@ const workflow = [
 ];
 
 export default function App() {
-  const { scan, baseline, isScanning, error, runScan } = useAccessibilityScan();
-  const ai = useAIFix({ scan, baseline, isScanning, scanError: error });
+  const { scan, baseline, isScanning, error, runScan, replaceScan, clearResults } = useAccessibilityScan();
+  const ai = useAIFix({ scan, baseline, isScanning, scanError: error, replaceScan, clearResults });
   const startScan = () => {
     ai.invalidateProposal();
     runScan();
@@ -133,10 +133,10 @@ export default function App() {
           </section>
           <CodeComparison
             scan={scan} isScanning={isScanning} scanError={error}
-            proposal={ai.proposal} isGenerating={ai.isGenerating} error={ai.error}
-            canGenerate={ai.canGenerate} onGenerate={ai.generateFix}
+            proposal={ai.proposal} isGenerating={ai.isGenerating} isApplying={ai.isApplying} error={ai.error}
+            canGenerate={ai.canGenerate} canApply={ai.canApply} onGenerate={ai.generateFix} onApply={ai.applyFix}
           />
-          <VerificationPanel baseline={baseline} />
+          <VerificationPanel baseline={baseline} verification={ai.verification} proposal={ai.proposal} error={ai.error} onReset={ai.resetDemo} />
           <section
             id="workflow"
             className="page-section workflow-section"

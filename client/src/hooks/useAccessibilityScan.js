@@ -118,5 +118,15 @@ export default function useAccessibilityScan() {
     }
   }, []);
 
-  return { scan, baseline, isScanning, error, runScan };
+  const replaceScan = useCallback((completedScan) => {
+    setScan(completedScan);
+    setError(null);
+  }, []);
+  const clearResults = useCallback(() => {
+    setScan(null);
+    setBaseline(null);
+    setError(null);
+  }, []);
+
+  return { scan, baseline, isScanning, error, runScan, replaceScan, clearResults };
 }
